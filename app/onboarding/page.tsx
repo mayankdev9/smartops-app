@@ -5,11 +5,16 @@ import { useRouter } from "next/navigation";
 import { AlertCircle, Check, FileSpreadsheet, Loader2, MessageCircle, Sparkles, Upload } from "lucide-react";
 import { business } from "@/lib/data";
 import { parseUpload, type ParsedUpload } from "@/lib/parseUpload";
+import { autoDetectMapping, FIELDS, isMappingValid, type Mapping } from "@/lib/mapping";
+import { computeDashboard } from "@/lib/analytics";
+import { useDataStore } from "@/lib/store";
 
 const STEPS = ["Business", "Connect data", "Done"];
+const CURRENCIES = ["₹", "$", "€", "£"];
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const setData = useDataStore((s) => s.setData);
   const [step, setStep] = useState(0);
   const [name, setName] = useState(business.name);
   const [type, setType] = useState(business.type);
@@ -18,6 +23,8 @@ export default function OnboardingPage() {
   const [parsed, setParsed] = useState<ParsedUpload | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [parsing, setParsing] = useState(false);
+  const [mapping, setMapping] = useState<Mapping>({});
+  const [currency, setCurrency] = useState("₹");
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -25,9 +32,11 @@ export default function OnboardingPage() {
     setParsing(true);
     setParseError(null);
     setParsed(null);
+    setMapping({});
     try {
       const result = await parseUpload(file);
       setParsed(result);
+      setMapping(autoDetectMapping(result.columns));
       setConnected(true);
     } catch (err) {
       setParseError(err instanceof Error ? err.message : "Could not read that file.");
@@ -37,6 +46,16 @@ export default function OnboardingPage() {
       e.target.value = ""; // allow re-selecting the same file
     }
   }
+
+  // Compute the dashboard from the uploaded rows + mapping and store it.
+  function finish() {
+    if (parsed && isMappingValid(mapping)) {
+      setData(computeDashboard(parsed.rows, mapping, currency, parsed.fileName));
+    }
+    setStep(2);
+  }
+
+  const canUseData = !!parsed && isMappingValid(mapping);
 
   return (
     <div className="h-full overflow-y-auto bg-slate-50">
@@ -196,6 +215,60 @@ export default function OnboardingPage() {
                 </div>
               )}
 
+              {/* Column mapping — auto-guessed, user can correct */}
+              {parsed && (
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">Map your columns</p>
+                      <p className="text-xs text-slate-500">We auto-detected these — adjust if needed.</p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-slate-500">Currency</span>
+                      <select
+                        value={currency}
+                        onChange={(e) => setCurrency(e.target.value)}
+                        className="rounded-lg border border-slate-300 px-2 py-1 text-sm outline-none focus:border-brand"
+                      >
+                        {CURRENCIES.map((c) => (
+                          <option key={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="space-y-2.5">
+                    {FIELDS.map((f) => (
+                      <div key={f.key} className="flex items-center gap-3">
+                        <div className="w-40 shrink-0">
+                          <span className="text-sm font-medium text-slate-700">{f.label}</span>
+                          {f.required && <span className="ml-1 text-red-500">*</span>}
+                          <p className="text-[11px] leading-tight text-slate-400">{f.hint}</p>
+                        </div>
+                        <select
+                          value={mapping[f.key] ?? ""}
+                          onChange={(e) => setMapping((m) => ({ ...m, [f.key]: e.target.value || undefined }))}
+                          className={`flex-1 rounded-lg border px-3 py-2 text-sm outline-none focus:border-brand ${
+                            f.required && !mapping[f.key] ? "border-red-300 bg-red-50/40" : "border-slate-300"
+                          }`}
+                        >
+                          <option value="">— not in my file —</option>
+                          {parsed.columns.map((c) => (
+                            <option key={c} value={c}>
+                              {c}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                  {!isMappingValid(mapping) && (
+                    <p className="mt-3 text-xs text-red-600">
+                      Map the required fields (Product & Units sold) to use your data.
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div className="flex gap-2">
                 <button
                   onClick={() => setStep(0)}
@@ -204,10 +277,11 @@ export default function OnboardingPage() {
                   Back
                 </button>
                 <button
-                  onClick={() => setStep(2)}
-                  className="flex-1 rounded-lg bg-brand py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark"
+                  onClick={finish}
+                  disabled={!!parsed && !canUseData}
+                  className="flex-1 rounded-lg bg-brand py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:opacity-40"
                 >
-                  {connected ? "Finish setup" : "Skip — use sample data"}
+                  {canUseData ? "Use my data →" : parsed ? "Map required fields to continue" : "Skip — use sample data"}
                 </button>
               </div>
             </div>

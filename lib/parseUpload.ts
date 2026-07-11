@@ -7,7 +7,8 @@ export interface ParsedUpload {
   fileName: string;
   columns: string[];
   rowCount: number;
-  preview: Record<string, string | number>[]; // first few rows
+  rows: Record<string, string | number>[]; // all rows (for computing metrics)
+  preview: Record<string, string | number>[]; // first few rows (for the UI table)
 }
 
 const MAX_PREVIEW_ROWS = 5;
@@ -31,6 +32,7 @@ export async function parseUpload(file: File): Promise<ParsedUpload> {
     fileName: file.name,
     columns,
     rowCount: rows.length,
+    rows,
     preview: rows.slice(0, MAX_PREVIEW_ROWS),
   };
 }

@@ -90,7 +90,8 @@ smartops-app/
 ├── lib/
 │   ├── mock.ts                 ← Mock engine: routes query→tool, canned answers,
 │   │                             fakes Critic pass (~93%) + latency
-│   └── data.ts                 ← Shared mock business data (single source of truth)
+│   ├── data.ts                 ← Shared mock business data + derived `insights`
+│   └── parseUpload.ts          ← Client-side .csv/.xlsx parser (SheetJS)
 ├── .env.local.example          ← Env var docs (none needed for mock)
 └── README.md                   ← Short run/architecture summary
 ```
@@ -104,7 +105,7 @@ smartops-app/
 | **Assistant** (hero) | `/` | Plain-English Q&A, suggested prompts on empty state, per-answer tool label + **"✓ Critic validated"** badge (or "⚠ Needs review"), response time, typing indicator. Wired to `/api/assistant`. |
 | **Dashboard** | `/dashboard` | 4 KPI cards; Recharts: revenue **area** chart (14d), ABC **donut**, top-SKU horizontal **bar**; "Reorder now" panel; slow-mover table. |
 | **Daily Alert** | `/alerts` | 8 AM digest with a **WhatsApp ⇄ Email** toggle (WhatsApp = phone-style chat mockup, Email = inbox mockup) + delivery-settings card. |
-| **Setup & Data** | `/onboarding` | 3-step stepper: business details → Excel/CSV upload **stub** (marks connected on file pick) → success, routes back to Chat. |
+| **Setup & Data** | `/onboarding` | 3-step stepper: business details → **real .csv/.xlsx upload** (SheetJS parses client-side → detected columns + row count + preview table, with spinner/error states) → success, routes back to Chat. |
 
 ---
 
@@ -202,7 +203,8 @@ wired in. Documented in `.env.local.example`:
 
 **Runtime:** `next@16.2.9`, `react@^19.0.0`, `react-dom@^19.0.0`,
 `recharts@^2.15.3` (installed 2.15.4), `lucide-react@^0.511.0`, `clsx@^2.1.1`,
-`tailwind-merge@^3.6.0`, `zustand@^5.0.5`.
+`tailwind-merge@^3.6.0`, `zustand@^5.0.5`, `xlsx@^0.18.5` (SheetJS — parses the
+`.csv`/`.xlsx` onboarding upload; one API for both formats).
 
 **Dev:** `typescript@^5`, `tailwindcss@^3.4.19`, `autoprefixer@^10.5.0`,
 `postcss@^8.5.15`, `eslint@^9`, `eslint-config-next@16.2.9`,
@@ -340,11 +342,13 @@ Done in the Jul 11 enhancement pass (Batch 1):
 - [x] Chat history persistence (localStorage) + Clear button
 - [x] 2 more assistant capabilities: `reorder` (reorder plan), `margin` (margins)
 
+Done in Batch 2 (Jul 11):
+- [x] Real .csv/.xlsx upload parsing (SheetJS) with detected columns + preview + error states
+
 Still open:
 - [ ] Wire Ahmer's real 5-LLM pipeline behind `/api/assistant` (pick option 1 or 2) — **deferred by Mayank; do later**
-- [ ] Real Excel/CSV upload parsing + column mapping (currently a stub) — Batch 2
-- [ ] Loading/skeleton + error states on Dashboard — Batch 2
-- [ ] Export/share (PDF or snapshot) — Batch 2
+- [ ] Use the uploaded data to actually drive the dashboard/mock (currently preview-only) — bigger change
+- [ ] Export/share (PDF or snapshot) — optional; adds a dep (jsPDF/html2canvas)
 - [ ] Actually *send* the daily alert (needs email/WhatsApp API + scheduler) — needs external setup
 - [ ] Auth / multi-tenant — overkill for the class demo; parked
 
@@ -359,6 +363,7 @@ Still open:
 | Jul 11, 2026 | Verified production build (`npm run build` clean); `git init` + initial commit; pushed to new public GitHub repo `mayankdev9/smartops-app` (new classic PAT after old one expired Jul 4). Next: Vercel import. |
 | Jul 11, 2026 | **Deployed to Vercel.** First auto-domain was `smartops-app-six` (`smartops-app.vercel.app` taken by unrelated "SmartOps Health"). Renamed Vercel project to `smartops-agent` + added **https://smartops-agent.vercel.app** as Production domain. Verified live: all pages 200, `/api/assistant` works with Critic flag. Auto-deploy on push enabled. **Evening deadline met.** |
 | Jul 11, 2026 | **Enhancement Batch 1** (commits `87b1786`, `7a1ee23`): mobile-responsive sidebar drawer; proactive insight cards on Dashboard; chat persistence + Clear; added `reorder` & `margin` assistant tools; fixed `slow` regex so all 6 suggestion chips route correctly. Built clean, pushed, auto-deployed, verified live (all 7 tools route). |
+| Jul 11, 2026 | **Enhancement Batch 2** (commit `8df9f5d`): real `.csv`/`.xlsx` upload parsing in Onboarding via SheetJS (`lib/parseUpload.ts`) — detected columns + row count + preview table + spinner/error states. Validated both formats parse (Node smoke test). Added `xlsx` dep. |
 
 ---
 

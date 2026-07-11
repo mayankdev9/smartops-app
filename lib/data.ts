@@ -1,3 +1,5 @@
+import type { DashboardData } from "./analytics";
+
 // Shared mock business data for SmartOps.
 // Every screen (Dashboard, Alerts, Chat mock) reads from here so the numbers
 // stay consistent across the product. When Ahmer's pipeline is live, this is
@@ -131,3 +133,23 @@ export const insights: Insight[] = [
     action: risingForecast ? "Pre-book ~10% extra for next month" : "Keep it up",
   },
 ];
+
+// The sample dataset packaged in the same shape an uploaded file produces, so
+// the Dashboard can render either from one code path (see lib/store.ts).
+export const sampleDashboard: DashboardData = {
+  source: "Sample data",
+  isSample: true,
+  currency: "₹",
+  kpiCards: [
+    { icon: "revenue", label: "Revenue (30d)", value: kpis.revenue30d, sub: `↑ ${kpis.revenueDeltaPct}% vs prior 30d`, tone: "up" },
+    { icon: "units", label: "Units Sold", value: kpis.unitsSold.toLocaleString(), sub: `across ${abcBreakdown.reduce((n, c) => n + c.skus, 0)} SKUs` },
+    { icon: "frozen", label: "Frozen Capital", value: kpis.frozenCapital, sub: `down from ${kpis.frozenCapitalPrev}`, tone: "up" },
+    { icon: "risk", label: "Stockout Risk", value: `${kpis.stockoutRiskCount} SKUs`, sub: "need reorder this week", tone: "warn" },
+  ],
+  insights,
+  abcBreakdown,
+  topSkus,
+  stockoutRisks,
+  slowMovers,
+  revenueTrend,
+};
