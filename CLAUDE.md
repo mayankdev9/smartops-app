@@ -136,7 +136,12 @@ markdown answer:
 | `abc` | "abc", "classify", "which products matter", "80/20" |
 | `forecast` | "forecast", "next 30", "demand", "predict" |
 | `kpi` | "kpi", "how's the business", "overview", "metrics" |
+| `reorder` | "reorder plan", "what should I order", "purchase order", "shopping list" |
+| `margin` | "margin", "profit", "markup", "most profitable", "profitability" |
 | `general` | fallback — lists what the assistant can do |
+
+> Order matters in `MOCKS` — `pickMock` returns the first regex match, so the
+> specific tools (`reorder`, `margin`) are listed before broader ones (`stockout`).
 
 - **Critic:** `criticValidated` is `true` ~93% of the time for data-backed tools
   (matches Ahmer's >90% target); `general`/fallback answers are never badged.

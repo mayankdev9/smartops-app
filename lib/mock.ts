@@ -75,7 +75,7 @@ const MOCKS: MockDef[] = [
   },
   {
     tool: "slow",
-    match: /slow ?mover|slow ?moving|frozen capital|dead stock|not selling|sitting|tied up|gathering dust/i,
+    match: /slow[- ]?mov|frozen|dead stock|not selling|sitting|tied up|gathering dust|idle stock/i,
     answer: `**You have ₹1.84L (~$2,200) of frozen capital in slow-movers.** These 4 SKUs haven't moved meaningfully in 60+ days:
 
 | SKU | Units held | Value | Last sale | Days idle |
