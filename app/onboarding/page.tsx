@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, FileSpreadsheet, MessageCircle, Sparkles, Upload } from "lucide-react";
+import { AlertCircle, Check, FileSpreadsheet, Loader2, MessageCircle, Sparkles, Upload } from "lucide-react";
 import { business } from "@/lib/data";
+import { parseUpload, type ParsedUpload } from "@/lib/parseUpload";
 
 const STEPS = ["Business", "Connect data", "Done"];
 
@@ -14,6 +15,28 @@ export default function OnboardingPage() {
   const [type, setType] = useState(business.type);
   const [skus, setSkus] = useState(String(business.skuCount));
   const [connected, setConnected] = useState(false);
+  const [parsed, setParsed] = useState<ParsedUpload | null>(null);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const [parsing, setParsing] = useState(false);
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setParsing(true);
+    setParseError(null);
+    setParsed(null);
+    try {
+      const result = await parseUpload(file);
+      setParsed(result);
+      setConnected(true);
+    } catch (err) {
+      setParseError(err instanceof Error ? err.message : "Could not read that file.");
+      setConnected(false);
+    } finally {
+      setParsing(false);
+      e.target.value = ""; // allow re-selecting the same file
+    }
+  }
 
   return (
     <div className="h-full overflow-y-auto bg-slate-50">
@@ -85,25 +108,39 @@ export default function OnboardingPage() {
                 SmartOps works with what you already have. No new system to learn.
               </p>
 
-              {/* Excel upload stub */}
+              {/* Excel / CSV upload — real client-side parse */}
               <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 py-8 text-center transition hover:border-brand hover:bg-blue-50/40">
-                <Upload size={28} className="mb-2 text-slate-400" />
-                <span className="text-sm font-medium text-slate-700">Drop your sales &amp; inventory Excel here</span>
-                <span className="mt-0.5 text-xs text-slate-400">.xlsx or .csv — we map the columns for you</span>
+                {parsing ? (
+                  <Loader2 size={28} className="mb-2 animate-spin text-brand" />
+                ) : (
+                  <Upload size={28} className="mb-2 text-slate-400" />
+                )}
+                <span className="text-sm font-medium text-slate-700">
+                  {parsing ? "Reading your file…" : "Drop your sales & inventory file here"}
+                </span>
+                <span className="mt-0.5 text-xs text-slate-400">.xlsx or .csv — we detect the columns for you</span>
                 <input
                   type="file"
-                  accept=".xlsx,.csv"
+                  accept=".xlsx,.xls,.csv"
                   className="hidden"
-                  onChange={() => setConnected(true)}
+                  onChange={handleFile}
+                  disabled={parsing}
                 />
               </label>
+
+              {parseError && (
+                <div className="flex items-start gap-2 rounded-lg border border-red-100 bg-red-50 p-3 text-sm text-red-700">
+                  <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                  <span>{parseError}</span>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <SourceCard
                   icon={<FileSpreadsheet size={18} className="text-emerald-600" />}
                   title="Excel / CSV"
-                  sub={connected ? "sales_july.xlsx ✓" : "Upload above"}
-                  active={connected}
+                  sub={parsed ? `${parsed.fileName} ✓` : "Upload above"}
+                  active={!!parsed}
                 />
                 <SourceCard
                   icon={<MessageCircle size={18} className="text-emerald-600" />}
@@ -111,6 +148,53 @@ export default function OnboardingPage() {
                   sub="Coming soon"
                 />
               </div>
+
+              {/* Parsed preview */}
+              {parsed && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
+                  <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
+                    <Check size={16} className="text-emerald-600" />
+                    <span className="font-semibold text-slate-800">
+                      {parsed.rowCount.toLocaleString()} rows · {parsed.columns.length} columns detected
+                    </span>
+                  </div>
+                  <div className="mb-3 flex flex-wrap gap-1.5">
+                    {parsed.columns.slice(0, 8).map((c) => (
+                      <span key={c} className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
+                        {c}
+                      </span>
+                    ))}
+                    {parsed.columns.length > 8 && (
+                      <span className="px-1 text-xs text-slate-400">+{parsed.columns.length - 8} more</span>
+                    )}
+                  </div>
+                  <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr>
+                          {parsed.columns.slice(0, 6).map((c) => (
+                            <th key={c} className="whitespace-nowrap border-b border-slate-100 bg-slate-50 px-2.5 py-1.5 text-left font-semibold text-slate-600">
+                              {c}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {parsed.preview.map((row, ri) => (
+                          <tr key={ri}>
+                            {parsed.columns.slice(0, 6).map((c) => (
+                              <td key={c} className="whitespace-nowrap border-b border-slate-50 px-2.5 py-1.5 text-slate-600">
+                                {String(row[c])}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-400">Showing first {parsed.preview.length} rows.</p>
+                </div>
+              )}
 
               <div className="flex gap-2">
                 <button

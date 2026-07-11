@@ -331,13 +331,22 @@ Remaining work is all **optional enhancement** (see Next steps): wiring Ahmer's 
 pipeline, a cleaner domain, real Excel upload, mobile responsiveness. Nothing is
 blocking; the deliverable is done.
 
-## Next steps (enhancements, not yet started)
+## Next steps (enhancements)
 
-- [ ] Wire Ahmer's real 5-LLM pipeline behind `/api/assistant` (pick option 1 or 2)
-- [ ] Deploy to Vercel (set `ANTHROPIC_API_KEY` or `ASSISTANT_BACKEND_URL` in env)
-- [ ] Real Excel upload handling + AI column mapping (currently a stub)
-- [ ] Mobile responsiveness pass (sidebar → drawer on small screens)
-- [ ] Richer charts / proactive-insight cards on the Dashboard
+Done in the Jul 11 enhancement pass (Batch 1):
+- [x] Deploy to Vercel — live at https://smartops-agent.vercel.app
+- [x] Mobile responsiveness — sidebar → hamburger drawer on small screens
+- [x] Proactive insight cards on the Dashboard (derived from `lib/data.ts`)
+- [x] Chat history persistence (localStorage) + Clear button
+- [x] 2 more assistant capabilities: `reorder` (reorder plan), `margin` (margins)
+
+Still open:
+- [ ] Wire Ahmer's real 5-LLM pipeline behind `/api/assistant` (pick option 1 or 2) — **deferred by Mayank; do later**
+- [ ] Real Excel/CSV upload parsing + column mapping (currently a stub) — Batch 2
+- [ ] Loading/skeleton + error states on Dashboard — Batch 2
+- [ ] Export/share (PDF or snapshot) — Batch 2
+- [ ] Actually *send* the daily alert (needs email/WhatsApp API + scheduler) — needs external setup
+- [ ] Auth / multi-tenant — overkill for the class demo; parked
 
 ---
 
@@ -349,6 +358,7 @@ blocking; the deliverable is done.
 | Jul 11, 2026 | Completed MVP: Sidebar nav + shared shell, Dashboard (Recharts), Daily Alert (WhatsApp/email), Onboarding; centralized `lib/data.ts`; all routes 200, clean typecheck. |
 | Jul 11, 2026 | Verified production build (`npm run build` clean); `git init` + initial commit; pushed to new public GitHub repo `mayankdev9/smartops-app` (new classic PAT after old one expired Jul 4). Next: Vercel import. |
 | Jul 11, 2026 | **Deployed to Vercel.** First auto-domain was `smartops-app-six` (`smartops-app.vercel.app` taken by unrelated "SmartOps Health"). Renamed Vercel project to `smartops-agent` + added **https://smartops-agent.vercel.app** as Production domain. Verified live: all pages 200, `/api/assistant` works with Critic flag. Auto-deploy on push enabled. **Evening deadline met.** |
+| Jul 11, 2026 | **Enhancement Batch 1** (commits `87b1786`, `7a1ee23`): mobile-responsive sidebar drawer; proactive insight cards on Dashboard; chat persistence + Clear; added `reorder` & `margin` assistant tools; fixed `slow` regex so all 6 suggestion chips route correctly. Built clean, pushed, auto-deployed, verified live (all 7 tools route). |
 
 ---
 
