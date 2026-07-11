@@ -14,10 +14,11 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { AlertTriangle, ArrowRight, Database, Package, RefreshCw, Snowflake, Sparkles, TrendingUp, Upload } from "lucide-react";
+import { AlertTriangle, ArrowRight, Database, FileSpreadsheet, FileText, Package, RefreshCw, Snowflake, Sparkles, TrendingUp, Upload } from "lucide-react";
 import type { Insight } from "@/lib/data";
 import type { KpiCard as KpiCardData } from "@/lib/analytics";
 import { useDashboardData, useDataStore } from "@/lib/store";
+import { exportExcel, exportPdf } from "@/lib/export";
 
 const INSIGHT_STYLES: Record<Insight["tone"], { bar: string; chip: string; icon: React.ReactNode }> = {
   urgent: { bar: "border-l-red-500", chip: "bg-red-50 text-red-700", icon: <AlertTriangle size={15} /> },
@@ -83,6 +84,23 @@ export default function DashboardPage() {
         <div>
           <h2 className="text-[15px] font-bold leading-tight text-slate-900">Dashboard</h2>
           <p className="text-xs leading-tight text-slate-500">Your operations at a glance</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="hidden text-xs text-slate-400 sm:inline">Export</span>
+          <button
+            onClick={() => exportExcel(d)}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 hover:text-emerald-600"
+            title="Download Excel report (.xlsx)"
+          >
+            <FileSpreadsheet size={14} /> Excel
+          </button>
+          <button
+            onClick={() => exportPdf(d)}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 hover:text-red-600"
+            title="Download PDF report"
+          >
+            <FileText size={14} /> PDF
+          </button>
         </div>
       </header>
 
