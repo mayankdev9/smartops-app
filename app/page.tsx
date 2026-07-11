@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BadgeCheck, Send, Sparkles } from "lucide-react";
+import { BadgeCheck, Send, Sparkles, Trash2 } from "lucide-react";
 import Markdown from "@/components/Markdown";
 
 interface Message {
@@ -14,8 +14,9 @@ interface Message {
 
 const SUGGESTIONS = [
   "Which SKUs are about to run out?",
+  "What should I order this week?",
+  "What's my most profitable product?",
   "Where is my capital frozen in slow-movers?",
-  "Which products actually matter? (ABC)",
   "Forecast Coca-Cola demand for next month",
   "How's the business doing?",
 ];
@@ -26,18 +27,53 @@ const TOOL_LABELS: Record<string, string> = {
   abc: "ABC Classification",
   forecast: "Demand Forecast",
   kpi: "KPI Dashboard",
+  reorder: "Reorder Plan",
+  margin: "Margin Analysis",
   general: "Assistant",
 };
+
+const STORAGE_KEY = "smartops-chat";
 
 export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Restore chat history on first mount.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) setMessages(JSON.parse(saved));
+    } catch {
+      /* ignore corrupt storage */
+    }
+    setLoaded(true);
+  }, []);
+
+  // Persist chat history whenever it changes (after the initial load).
+  useEffect(() => {
+    if (!loaded) return;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+    } catch {
+      /* ignore quota errors */
+    }
+  }, [messages, loaded]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, loading]);
+
+  function clearChat() {
+    setMessages([]);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+  }
 
   async function send(text: string) {
     const trimmed = text.trim();
@@ -85,9 +121,20 @@ export default function ChatPage() {
           <h2 className="text-[15px] font-bold leading-tight text-slate-900">Assistant</h2>
           <p className="text-xs leading-tight text-slate-500">Ask your operations anything, in plain English</p>
         </div>
-        <div className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-          <BadgeCheck size={14} />
-          Critic-validated answers
+        <div className="flex items-center gap-2">
+          {messages.length > 0 && (
+            <button
+              onClick={clearChat}
+              className="flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
+            >
+              <Trash2 size={13} />
+              Clear
+            </button>
+          )}
+          <div className="hidden items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 sm:flex">
+            <BadgeCheck size={14} />
+            Critic-validated answers
+          </div>
         </div>
       </header>
 

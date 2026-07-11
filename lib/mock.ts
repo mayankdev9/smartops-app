@@ -5,7 +5,15 @@
 // Ahmer's real pipeline drops in behind POST /api/assistant, this file is the
 // ONLY thing that gets removed — the Chat UI never changes.
 
-export type ToolId = "stockout" | "slow" | "abc" | "forecast" | "kpi" | "general";
+export type ToolId =
+  | "stockout"
+  | "slow"
+  | "abc"
+  | "forecast"
+  | "kpi"
+  | "reorder"
+  | "margin"
+  | "general";
 
 export interface AssistantResponse {
   answer: string; // markdown/HTML body
@@ -22,7 +30,36 @@ interface MockDef {
 }
 
 // --- Canned responses, written in the voice Ahmer's assistant would use ---
+// Order matters: pickMock returns the FIRST regex that matches, so more
+// specific tools (reorder, margin) are listed before the broader ones.
 const MOCKS: MockDef[] = [
+  {
+    tool: "reorder",
+    match: /reorder plan|what (should i|to) order|purchase order|order list|shopping list|how much (should i|to) (buy|order)/i,
+    answer: `**Consolidated reorder plan for this week** (based on stock cover + supplier lead times):
+
+| SKU | Reorder qty | Est. cost | Priority |
+|---|---|---|---|
+| **Coca-Cola 500ml** | 600 units | ₹9,600 | 🔴 Today |
+| **Lay's Classic 45g** | 900 units | ₹6,300 | 🔴 Today |
+| **Dettol Soap 4-pack** | 250 units | ₹11,250 | 🟠 This week |
+
+**Total outlay: ~₹27,150.** Placing the two red-priority orders today covers you through the weekend — your highest-volume days. Everything else has 7+ days of cover.`,
+  },
+  {
+    tool: "margin",
+    match: /margin|profit|markup|most profitable|least profitable|profitability/i,
+    answer: `**Margin analysis — where you actually make money:**
+
+| SKU | Revenue share | Gross margin |
+|---|---|---|
+| **Dettol Soap 4-pack** | 6% | **28%** ⭐ |
+| **Amul Milk 1L** | 18% | 9% |
+| **Lay's Classic 45g** | 14% | 19% |
+| **Coca-Cola 500ml** | 11% | 16% |
+
+💡 **Key insight:** Amul Milk drives the most *volume* but the thinnest *margin* (9%). Your **soap and snack** lines earn far more per rupee sold. Pushing a few more high-margin SKUs alongside the milk traffic would lift overall profitability without needing more customers.`,
+  },
   {
     tool: "stockout",
     match: /stock ?out|run ?out|running low|reorder|out of stock|low stock|risk this week/i,
@@ -97,9 +134,11 @@ const GENERAL: MockDef = {
   answer: `I can help you run your operations in plain English. Try asking me about:
 
 - **Stockout risk** — "Which SKUs are about to run out?"
+- **Reorder plan** — "What should I order this week?"
 - **Slow-movers** — "Where is my capital frozen?"
 - **ABC analysis** — "Which products actually matter?"
 - **Demand forecast** — "How much Coca-Cola will I sell next month?"
+- **Margins** — "What's my most profitable product?"
 - **Business KPIs** — "How's the business doing?"
 
 What would you like to look at?`,

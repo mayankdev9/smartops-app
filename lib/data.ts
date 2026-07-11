@@ -92,3 +92,42 @@ export const forecast = [
   { sku: "Parle-G 800g", actual: 420, forecast: 405, trendPct: -4 },
   { sku: "Amul Milk 1L", actual: 1180, forecast: 1240, trendPct: 5 },
 ];
+
+// Proactive insights — what the assistant surfaces WITHOUT being asked.
+// Derived from the data above so they stay consistent with the rest of the app.
+export type InsightTone = "urgent" | "warn" | "good";
+
+export interface Insight {
+  tone: InsightTone;
+  title: string;
+  detail: string;
+  action: string;
+}
+
+const topSlow = slowMovers[0];
+const risingForecast = forecast.find((f) => f.trendPct >= 10);
+
+export const insights: Insight[] = [
+  {
+    tone: "urgent",
+    title: `${stockoutRisks[0].sku} runs out in ${stockoutRisks[0].daysLeft} days`,
+    detail: `Selling ~${stockoutRisks[0].dailySales}/day with only ${stockoutRisks[0].onHand} on hand.`,
+    action: `Reorder ${stockoutRisks[0].reorder} units today`,
+  },
+  {
+    tone: "warn",
+    title: `${kpis.frozenCapital} of capital is frozen in slow-movers`,
+    detail: `${topSlow.sku} alone (${topSlow.value}) hasn't sold in ${topSlow.daysIdle} days.`,
+    action: "Run a clearance bundle to free cash",
+  },
+  {
+    tone: "good",
+    title: risingForecast
+      ? `${risingForecast.sku} demand is trending up ${risingForecast.trendPct}%`
+      : `Revenue up ${kpis.revenueDeltaPct}% vs last month`,
+    detail: risingForecast
+      ? `Forecast ${risingForecast.forecast} units next 30 days vs ${risingForecast.actual} last period.`
+      : `Inventory turning at ${kpis.inventoryTurns}× — healthy for FMCG.`,
+    action: risingForecast ? "Pre-book ~10% extra for next month" : "Keep it up",
+  },
+];

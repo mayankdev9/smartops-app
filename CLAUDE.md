@@ -4,7 +4,9 @@
 **Team:** Team 5 — Ahmer Rizvi, Paola Whittier, Abdulrahman Almarwan, Mayank Dev
 **Owner of this app:** Mayank Dev (front-end / UI/UX + integration seam)
 **Location:** `~/Documents/Claude/Applied Product Management/smartops-app/`
-**Status:** MVP complete (Jul 11, 2026) — all 5 screens built, verified, running locally
+**Repo:** https://github.com/mayankdev9/smartops-app (public, `main` branch)
+**Live:** https://smartops-agent.vercel.app (Vercel; auto-deploys on push to `main`; legacy alias `smartops-app-six.vercel.app` also resolves)
+**Status:** ✅ MVP complete & DEPLOYED (Jul 11, 2026) — all 5 screens + live API verified in production
 
 > This file is the source-of-truth for the SmartOps front-end. The course-level
 > status pointer lives in `../CLAUDE.md` (SmartOps section). Product/positioning
@@ -241,16 +243,33 @@ Match these when adding to the app so it stays consistent:
 
 ---
 
-## Deployment (Vercel) — planned, not yet done
+## Deployment
 
-Same flow as claro-app:
-1. Push `smartops-app/` to a GitHub repo (its own repo, or a subdir import).
-2. On Vercel: **New Project → import the repo** → framework auto-detected as
-   Next.js. Root directory = `smartops-app/` if it's a subdir.
-3. Add env vars only if the real pipeline is wired (`ANTHROPIC_API_KEY` **or**
-   `ASSISTANT_BACKEND_URL`). The mock needs none.
-4. Deploy → get a `*.vercel.app` URL (Claro's is `claro-app-three.vercel.app`).
-5. Run `npm run build` locally first to catch errors before Vercel does.
+### GitHub — ✅ DONE (Jul 11, 2026)
+- Repo: **https://github.com/mayankdev9/smartops-app** (public, `main`)
+- Initial commit `4ca6c0a`. Credentials cached in macOS keychain (classic PAT,
+  `repo` scope) — future `git push` works without re-auth.
+- Local identity for this repo: `Mayank Dev <mayank@smartops.ai>` (branded, matches
+  the Claro convention; set locally, not global).
+
+### Vercel — ✅ DONE (Jul 11, 2026)
+- **Live URL: https://smartops-agent.vercel.app**
+- Vercel team: `mayankdev` (Hobby/free). Project name: `smartops-agent` (renamed
+  from `smartops-app`). Imported `mayankdev9/smartops-app`, Next.js auto-detected,
+  root `./`, **no env vars** (mock needs none).
+- **Every push to `main` now auto-deploys** (GitHub↔Vercel integration).
+- Verified in production: all 4 pages 200; live `/api/assistant` routes correctly
+  (stockout/kpi/forecast) with working `criticValidated` flag.
+
+> ⚠️ **Domain history:** `smartops-app.vercel.app` was taken by an unrelated company
+> ("SmartOps Health"), so the first deploy auto-assigned `smartops-app-six`. Renamed
+> the project to `smartops-agent` and added `smartops-agent.vercel.app` as a
+> Production domain (Settings → Domains). Both `smartops-agent` and the legacy
+> `smartops-app-six` resolve; **`smartops-agent` is the canonical URL to share.**
+> Note: the GitHub *repo* is still named `smartops-app` — only the Vercel project
+> and public domain were renamed.
+
+> Production build verified locally (`npm run build` clean) before every push.
 
 ---
 
@@ -298,14 +317,14 @@ Same flow as claro-app:
 
 ---
 
-## ▶ RESUME HERE (paused Jul 11, 2026 — target: finish by this evening)
+## ▶ STATUS (Jul 11, 2026 evening)
 
-MVP is complete, verified, and was running locally. Paused mid-afternoon; resuming
-in ~1–2 hours. To pick back up:
-1. `cd` into the app and run `npm run dev` (server may need restarting after the break).
-2. Open http://localhost:3000 and click through all 4 screens.
-3. Continue with the enhancements below — **not yet decided which one to start with**;
-   confirm priority with Mayank on resume given the evening deadline.
+✅ **Evening goal met: deployed live to Vercel** at https://smartops-agent.vercel.app
+— MVP built, pushed to GitHub, deployed, and verified end-to-end in production.
+
+Remaining work is all **optional enhancement** (see Next steps): wiring Ahmer's real
+pipeline, a cleaner domain, real Excel upload, mobile responsiveness. Nothing is
+blocking; the deliverable is done.
 
 ## Next steps (enhancements, not yet started)
 
@@ -323,6 +342,8 @@ in ~1–2 hours. To pick back up:
 |---|---|
 | Jul 11, 2026 | Scaffolded app (Next.js 16, Claro stack); built mock `/api/assistant` + `lib/mock.ts`; shipped Chat/Assistant screen wired end-to-end; verified. |
 | Jul 11, 2026 | Completed MVP: Sidebar nav + shared shell, Dashboard (Recharts), Daily Alert (WhatsApp/email), Onboarding; centralized `lib/data.ts`; all routes 200, clean typecheck. |
+| Jul 11, 2026 | Verified production build (`npm run build` clean); `git init` + initial commit; pushed to new public GitHub repo `mayankdev9/smartops-app` (new classic PAT after old one expired Jul 4). Next: Vercel import. |
+| Jul 11, 2026 | **Deployed to Vercel.** First auto-domain was `smartops-app-six` (`smartops-app.vercel.app` taken by unrelated "SmartOps Health"). Renamed Vercel project to `smartops-agent` + added **https://smartops-agent.vercel.app** as Production domain. Verified live: all pages 200, `/api/assistant` works with Critic flag. Auto-deploy on push enabled. **Evening deadline met.** |
 
 ---
 

@@ -13,15 +13,40 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { AlertTriangle, Package, RefreshCw, Snowflake, TrendingUp } from "lucide-react";
+import { AlertTriangle, ArrowRight, Package, RefreshCw, Snowflake, Sparkles, TrendingUp } from "lucide-react";
 import {
   abcBreakdown,
+  insights,
+  type Insight,
   kpis,
   revenueTrend,
   slowMovers,
   stockoutRisks,
   topSkus,
 } from "@/lib/data";
+
+const INSIGHT_STYLES: Record<Insight["tone"], { bar: string; chip: string; icon: React.ReactNode }> = {
+  urgent: { bar: "border-l-red-500", chip: "bg-red-50 text-red-700", icon: <AlertTriangle size={15} /> },
+  warn: { bar: "border-l-amber-500", chip: "bg-amber-50 text-amber-700", icon: <Snowflake size={15} /> },
+  good: { bar: "border-l-emerald-500", chip: "bg-emerald-50 text-emerald-700", icon: <TrendingUp size={15} /> },
+};
+
+function InsightCard({ insight }: { insight: Insight }) {
+  const s = INSIGHT_STYLES[insight.tone];
+  return (
+    <div className={`rounded-xl border border-l-4 border-slate-200 bg-white p-4 ${s.bar}`}>
+      <div className={`mb-2 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold ${s.chip}`}>
+        {s.icon}
+        {insight.tone === "urgent" ? "Act now" : insight.tone === "warn" ? "Watch" : "Good news"}
+      </div>
+      <p className="text-sm font-semibold text-slate-900">{insight.title}</p>
+      <p className="mt-0.5 text-xs text-slate-500">{insight.detail}</p>
+      <p className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-brand">
+        <ArrowRight size={13} /> {insight.action}
+      </p>
+    </div>
+  );
+}
 
 function KpiCard({
   icon,
@@ -68,6 +93,22 @@ export default function DashboardPage() {
       </header>
 
       <div className="mx-auto max-w-5xl space-y-5 p-6">
+        {/* Proactive insights — surfaced without being asked */}
+        <div>
+          <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+            <Sparkles size={16} className="text-brand" />
+            Proactive insights
+            <span className="ml-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+              Critic-validated
+            </span>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {insights.map((ins, i) => (
+              <InsightCard key={i} insight={ins} />
+            ))}
+          </div>
+        </div>
+
         {/* KPI cards */}
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <KpiCard
