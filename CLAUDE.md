@@ -90,8 +90,12 @@ smartops-app/
 ├── lib/
 │   ├── mock.ts                 ← Mock engine: routes query→tool, canned answers,
 │   │                             fakes Critic pass (~93%) + latency
-│   ├── data.ts                 ← Shared mock business data + derived `insights`
-│   └── parseUpload.ts          ← Client-side .csv/.xlsx parser (SheetJS)
+│   ├── data.ts                 ← Sample business data + `insights` + `sampleDashboard`
+│   ├── parseUpload.ts          ← Client-side .csv/.xlsx parser (SheetJS)
+│   ├── mapping.ts              ← Auto-detect + validate column→field mapping
+│   ├── analytics.ts            ← computeDashboard(rows, mapping) → real KPIs/ABC/…
+│   ├── store.ts                ← zustand (persisted): holds computed dashboard
+│   └── export.ts               ← Excel (SheetJS) + PDF (jsPDF) report export
 ├── .env.local.example          ← Env var docs (none needed for mock)
 └── README.md                   ← Short run/architecture summary
 ```
@@ -103,9 +107,9 @@ smartops-app/
 | Screen | Route | What's there |
 |---|---|---|
 | **Assistant** (hero) | `/` | Plain-English Q&A, suggested prompts on empty state, per-answer tool label + **"✓ Critic validated"** badge (or "⚠ Needs review"), response time, typing indicator. Wired to `/api/assistant`. |
-| **Dashboard** | `/dashboard` | 4 KPI cards; Recharts: revenue **area** chart (14d), ABC **donut**, top-SKU horizontal **bar**; "Reorder now" panel; slow-mover table. |
+| **Dashboard** | `/dashboard` | **Data-driven** (sample or uploaded — via `useDashboardData()`). Data-source banner + reset; proactive insight cards; 4 KPI cards; Recharts (revenue area, ABC donut, top-SKU bar); "Reorder now" + slow-mover panels; empty states. **Excel + PDF export** buttons in the header. |
 | **Daily Alert** | `/alerts` | 8 AM digest with a **WhatsApp ⇄ Email** toggle (WhatsApp = phone-style chat mockup, Email = inbox mockup) + delivery-settings card. |
-| **Setup & Data** | `/onboarding` | 3-step stepper: business details → **real .csv/.xlsx upload** (SheetJS parses client-side → detected columns + row count + preview table, with spinner/error states) → success, routes back to Chat. |
+| **Setup & Data** | `/onboarding` | 3-step stepper: business details → **real .csv/.xlsx upload** (SheetJS parse → preview) → **column-mapping UI** (auto-detected, editable) + currency picker → "Use my data" computes the dashboard and stores it → success. Uploaded data now **drives the Dashboard**. |
 
 ---
 
@@ -148,6 +152,34 @@ markdown answer:
   (matches Ahmer's >90% target); `general`/fallback answers are never badged.
 - **Latency:** simulated 700–1600 ms, and the route `await`s it so the typing
   indicator feels real.
+
+---
+
+## How uploaded data drives the app
+
+```
+Onboarding upload (.csv/.xlsx)
+  → parseUpload()            rows + columns                     (lib/parseUpload.ts)
+  → autoDetectMapping()      guess product/units/stock/price    (lib/mapping.ts)
+  → [user confirms mapping + currency in the UI]
+  → computeDashboard()       real KPIs/ABC/stockout/slow/insights (lib/analytics.ts)
+  → useDataStore.setData()   persisted in localStorage           (lib/store.ts)
+  → Dashboard reads useDashboardData() → uploaded data or sampleDashboard
+  → export.ts                Excel/PDF of whatever is showing     (lib/export.ts)
+```
+
+Key points:
+- **One render path.** `sampleDashboard` (in `lib/data.ts`) and `computeDashboard`
+  output the same `DashboardData` shape, so the Dashboard doesn't branch on source.
+- **Small persistence.** The store keeps the *computed* `DashboardData` (aggregates
+  + top-N lists), not raw rows — safe for localStorage, survives refresh.
+- **Robust to any schema.** Auto-mapping guesses columns by name; the user can
+  correct via dropdowns. Required fields: Product + Units sold. Missing optional
+  fields (stock/price/cost) degrade gracefully (cards show "—" with a hint).
+- **Currency-aware.** Chosen in onboarding (₹/$/€/£), threaded through analytics + UI.
+- **Known limit:** the **Assistant** mock still answers from sample data (it's
+  server-side; wiring uploaded metrics into `businessContext` is a listed next step).
+  Only the **Dashboard** currently reflects the upload.
 
 ---
 
@@ -203,8 +235,9 @@ wired in. Documented in `.env.local.example`:
 
 **Runtime:** `next@16.2.9`, `react@^19.0.0`, `react-dom@^19.0.0`,
 `recharts@^2.15.3` (installed 2.15.4), `lucide-react@^0.511.0`, `clsx@^2.1.1`,
-`tailwind-merge@^3.6.0`, `zustand@^5.0.5`, `xlsx@^0.18.5` (SheetJS — parses the
-`.csv`/`.xlsx` onboarding upload; one API for both formats).
+`tailwind-merge@^3.6.0`, `zustand@^5.0.5` (now used — the data store), `xlsx@^0.18.5`
+(SheetJS — parses the `.csv`/`.xlsx` upload **and** writes the Excel export),
+`jspdf@^4.2.1` + `jspdf-autotable@^5.0.8` (PDF report export).
 
 **Dev:** `typescript@^5`, `tailwindcss@^3.4.19`, `autoprefixer@^10.5.0`,
 `postcss@^8.5.15`, `eslint@^9`, `eslint-config-next@16.2.9`,
@@ -324,14 +357,18 @@ Match these when adding to the app so it stays consistent:
 
 ---
 
-## ▶ STATUS (Jul 11, 2026 evening)
+## ▶ STATUS (Jul 11, 2026 evening — PAUSED here)
 
-✅ **Evening goal met: deployed live to Vercel** at https://smartops-agent.vercel.app
-— MVP built, pushed to GitHub, deployed, and verified end-to-end in production.
+✅ **Live at https://smartops-agent.vercel.app** — MVP built, deployed, and then
+enhanced across 3 batches (all shipped & verified in production):
+- Batch 1: mobile-responsive nav · proactive insight cards · chat persistence · +2 assistant tools (reorder, margin)
+- Batch 2: real `.csv`/`.xlsx` upload parsing
+- Batch 3: uploaded file **drives the Dashboard** (auto column-mapping + currency + real computed KPIs/ABC/stockout/slow/insights) · **Excel + PDF export**
 
-Remaining work is all **optional enhancement** (see Next steps): wiring Ahmer's real
-pipeline, a cleaner domain, real Excel upload, mobile responsiveness. Nothing is
-blocking; the deliverable is done.
+**Paused here.** Nothing is blocking or half-done. Next when resuming (all optional,
+see Next steps): make the **Assistant** reflect uploaded data (only the Dashboard does
+today), wire Ahmer's real pipeline, or send real daily alerts. First thing to try on
+resume: upload a **real** data file and confirm the auto column-mapping is correct.
 
 ## Next steps (enhancements)
 
@@ -345,10 +382,14 @@ Done in the Jul 11 enhancement pass (Batch 1):
 Done in Batch 2 (Jul 11):
 - [x] Real .csv/.xlsx upload parsing (SheetJS) with detected columns + preview + error states
 
+Done in Batch 3 (Jul 11):
+- [x] Uploaded file **drives the Dashboard** — column mapping (auto + manual), currency picker, real computed KPIs/ABC/stockout/slow-movers/insights, data-source banner + reset
+- [x] **Excel + PDF export** of the report from the Dashboard
+
 Still open:
 - [ ] Wire Ahmer's real 5-LLM pipeline behind `/api/assistant` (pick option 1 or 2) — **deferred by Mayank; do later**
-- [ ] Use the uploaded data to actually drive the dashboard/mock (currently preview-only) — bigger change
-- [ ] Export/share (PDF or snapshot) — optional; adds a dep (jsPDF/html2canvas)
+- [ ] Make the **Assistant** answers reflect uploaded data too (currently only the Dashboard does; the mock is server-side and still uses sample) — would pass computed metrics in `businessContext`
+- [ ] Revenue-trend chart for uploads needs a date column (currently shows a hint) — parse dates + aggregate by day
 - [ ] Actually *send* the daily alert (needs email/WhatsApp API + scheduler) — needs external setup
 - [ ] Auth / multi-tenant — overkill for the class demo; parked
 
@@ -364,6 +405,7 @@ Still open:
 | Jul 11, 2026 | **Deployed to Vercel.** First auto-domain was `smartops-app-six` (`smartops-app.vercel.app` taken by unrelated "SmartOps Health"). Renamed Vercel project to `smartops-agent` + added **https://smartops-agent.vercel.app** as Production domain. Verified live: all pages 200, `/api/assistant` works with Critic flag. Auto-deploy on push enabled. **Evening deadline met.** |
 | Jul 11, 2026 | **Enhancement Batch 1** (commits `87b1786`, `7a1ee23`): mobile-responsive sidebar drawer; proactive insight cards on Dashboard; chat persistence + Clear; added `reorder` & `margin` assistant tools; fixed `slow` regex so all 6 suggestion chips route correctly. Built clean, pushed, auto-deployed, verified live (all 7 tools route). |
 | Jul 11, 2026 | **Enhancement Batch 2** (commit `8df9f5d`): real `.csv`/`.xlsx` upload parsing in Onboarding via SheetJS (`lib/parseUpload.ts`) — detected columns + row count + preview table + spinner/error states. Validated both formats parse (Node smoke test). Added `xlsx` dep. |
+| Jul 11, 2026 | **Enhancement Batch 3** (commits `0d8b3c3`, `e294315`): uploaded file now **drives the Dashboard** — new `lib/mapping.ts` (auto-detect columns), `lib/analytics.ts` (`computeDashboard`), `lib/store.ts` (zustand, persisted); Onboarding column-mapping UI + currency; Dashboard renders sample-or-uploaded via `useDashboardData()` with banner/reset/empty-states. Plus **Excel + PDF export** (`lib/export.ts`, +`jspdf`/`jspdf-autotable`). Verified: analytics + export via Node, typecheck, build, live. |
 
 ---
 
