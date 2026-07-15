@@ -358,18 +358,32 @@ Match these when adding to the app so it stays consistent:
 
 ---
 
-## ▶ STATUS (Jul 11, 2026 evening — PAUSED here)
+## ▶ STATUS (Jul 15, 2026 — PAUSED, waiting on Ahmer)
 
-✅ **Live at https://smartops-agent.vercel.app** — MVP built, deployed, and then
-enhanced across 3 batches (all shipped & verified in production):
-- Batch 1: mobile-responsive nav · proactive insight cards · chat persistence · +2 assistant tools (reorder, margin)
-- Batch 2: real `.csv`/`.xlsx` upload parsing
-- Batch 3: uploaded file **drives the Dashboard** (auto column-mapping + currency + real computed KPIs/ABC/stockout/slow/insights) · **Excel + PDF export**
+✅ **Our repo/deploy:** `github.com/mayankdev9/smartops-app` → **https://smartops-agent.vercel.app**
+(MVP + 3 enhancement batches + 2 feedback UI batches). **Backend = still the mock.**
 
-**Paused here.** Nothing is blocking or half-done. Next when resuming (all optional,
-see Next steps): make the **Assistant** reflect uploaded data (only the Dashboard does
-today), wire Ahmer's real pipeline, or send real daily alerts. First thing to try on
-resume: upload a **real** data file and confirm the auto column-mapping is correct.
+### ⚠️ KEY SITUATION — two diverged deployments (discovered Jul 15)
+There are **two separate live versions** of SmartOps:
+| | `smartops-app-five.vercel.app` (Ahmer's) | `smartops-agent.vercel.app` (ours) |
+|---|---|---|
+| Front-end | **OLD** (Assistant is landing, `/assistant` = 404) + his own tweaks (sidebar shows the data file) | **NEW** (Dashboard landing, chat at `/assistant`, interactive, business-health) |
+| Backend | **Ahmer's REAL 5-LLM + Critic pipeline** ✅ (honors our contract — badge/tool/latency all work) | our mock |
+
+**How we know:** his live answers reference real SKU codes / ₹ revenue / Summary·Risks·Actions·Confidence at ~9s latency (not our canned mock); `smartops-app-five/assistant` = 404 (older FE). Our feedback UI changes touch **8 files, none of them `app/api/assistant` or `lib/mock`** — so his backend change and our UI changes are conflict-free by design (the seam worked).
+
+### The plan (sent to Ahmer via WhatsApp, Jul 15 — awaiting reply)
+Consolidate onto **one repo**. Preferred: Ahmer shares his `/api/assistant` change (file + backend URL/env vars); Mayank folds it into this repo → `smartops-agent` becomes canonical (new UI + real backend); retire `smartops-app-five`. Alternative: Ahmer owns UI on this repo via branches. **Decision pending Ahmer's answer** on (1) which files he changed, (2) backend URL/env vars, (3) where `smartops-app-five` source lives.
+
+### Feedback UI work done so far (Jul 15) — all pure UI, seam untouched
+- ✅ **Batch 1** (`7c0981f`): default landing = **Dashboard** (`/`→`/dashboard`); chat moved to `/assistant`; sidebar reordered to customer-journey flow.
+- ✅ **Batch 2** (`f6efe5c`): **Business Health hero** (Healthy/Watch/Action-needed + top priority); **clickable SKUs** on reorder list + slow-movers → `SkuDrawer` detail panel.
+- ⏸ **Batch 3** (Alerts redesign + Generate PO) and **Batch 4** (reposition assistant + Help/FAQ) — **NOT started**, paused pending the Ahmer/consolidation decision so we don't diverge further.
+- **Locked value prop:** *"An AI General Manager for small distributors"* — sub-line: *"Runs your operations, flags what's urgent, and tells you what to do next — every answer validated before you act."* (to thread into Assistant/sidebar/onboarding in batch 4).
+
+**Rollback safety:** current HEAD tagged `feedback-ui-v1` (local) — the pre-consolidation UI state, if we ever need to revert.
+
+**Prior enhancement batches (Jul 11), all shipped & live:** mobile nav · proactive insights · chat persistence · reorder/margin tools · real `.csv`/`.xlsx` upload driving the Dashboard (auto column-mapping + currency) · Excel + PDF export.
 
 ## Next steps (enhancements)
 
@@ -407,6 +421,8 @@ Still open:
 | Jul 11, 2026 | **Enhancement Batch 1** (commits `87b1786`, `7a1ee23`): mobile-responsive sidebar drawer; proactive insight cards on Dashboard; chat persistence + Clear; added `reorder` & `margin` assistant tools; fixed `slow` regex so all 6 suggestion chips route correctly. Built clean, pushed, auto-deployed, verified live (all 7 tools route). |
 | Jul 11, 2026 | **Enhancement Batch 2** (commit `8df9f5d`): real `.csv`/`.xlsx` upload parsing in Onboarding via SheetJS (`lib/parseUpload.ts`) — detected columns + row count + preview table + spinner/error states. Validated both formats parse (Node smoke test). Added `xlsx` dep. |
 | Jul 15, 2026 | **Feedback pass** started (commit `7c0981f`): default landing = **Dashboard** (`/` → `/dashboard`); Chat moved to **`/assistant`** (end of flow); sidebar reordered to the customer-journey sequence. Per class/prof feedback (`Group Project/Feedbacks on SmartOps.docx`). API seam untouched. **Note:** Ahmer's backend connection is not in this repo — verified our repo + live deploy are still the mock. |
+| Jul 15, 2026 | **Feedback batch 2** (commit `f6efe5c`): Business Health hero + clickable SKUs → `components/SkuDrawer.tsx` detail panel; `businessHealth()` in analytics. |
+| Jul 15, 2026 | **Divergence discovered:** Ahmer's real backend is live at **`smartops-app-five.vercel.app`** (separate deploy, OLD front-end). Ours (`smartops-agent`) has the new UI + mock. Sent WhatsApp asking Ahmer for his `/api/assistant` change + backend URL to consolidate onto one repo. **Paused batches 3–4** until he replies. Tagged `feedback-ui-v1`. Synced both CLAUDE.md files. |
 | Jul 11, 2026 | **Enhancement Batch 3** (commits `0d8b3c3`, `e294315`): uploaded file now **drives the Dashboard** — new `lib/mapping.ts` (auto-detect columns), `lib/analytics.ts` (`computeDashboard`), `lib/store.ts` (zustand, persisted); Onboarding column-mapping UI + currency; Dashboard renders sample-or-uploaded via `useDashboardData()` with banner/reset/empty-states. Plus **Excel + PDF export** (`lib/export.ts`, +`jspdf`/`jspdf-autotable`). Verified: analytics + export via Node, typecheck, build, live. |
 
 ---
