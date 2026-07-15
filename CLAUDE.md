@@ -79,10 +79,11 @@ smartops-app/
 ├── app/
 │   ├── layout.tsx              ← Root shell: <Sidebar/> + <main> wrapper (all routes)
 │   ├── globals.css             ← Tailwind + fade-in / typing-dot animations
-│   ├── page.tsx                ← ASSISTANT (Chat) — route "/", the hero
-│   ├── dashboard/page.tsx      ← DASHBOARD — KPI cards + Recharts
+│   ├── page.tsx                ← "/" → redirects to /dashboard (default landing)
+│   ├── dashboard/page.tsx      ← DASHBOARD (landing) — data-driven KPIs + Recharts
+│   ├── assistant/page.tsx      ← ASSISTANT (Chat) — route /assistant (end of flow)
 │   ├── alerts/page.tsx         ← DAILY ALERT — 8 AM WhatsApp/email digest
-│   ├── onboarding/page.tsx     ← SETUP & DATA — 3-step onboarding + Excel stub
+│   ├── onboarding/page.tsx     ← SETUP & DATA — 3-step onboarding + real upload
 │   └── api/assistant/route.ts  ← THE INTEGRATION SEAM (mock today, Ahmer later)
 ├── components/
 │   ├── Sidebar.tsx             ← Shared left nav + brand + Critic trust badge
@@ -405,6 +406,7 @@ Still open:
 | Jul 11, 2026 | **Deployed to Vercel.** First auto-domain was `smartops-app-six` (`smartops-app.vercel.app` taken by unrelated "SmartOps Health"). Renamed Vercel project to `smartops-agent` + added **https://smartops-agent.vercel.app** as Production domain. Verified live: all pages 200, `/api/assistant` works with Critic flag. Auto-deploy on push enabled. **Evening deadline met.** |
 | Jul 11, 2026 | **Enhancement Batch 1** (commits `87b1786`, `7a1ee23`): mobile-responsive sidebar drawer; proactive insight cards on Dashboard; chat persistence + Clear; added `reorder` & `margin` assistant tools; fixed `slow` regex so all 6 suggestion chips route correctly. Built clean, pushed, auto-deployed, verified live (all 7 tools route). |
 | Jul 11, 2026 | **Enhancement Batch 2** (commit `8df9f5d`): real `.csv`/`.xlsx` upload parsing in Onboarding via SheetJS (`lib/parseUpload.ts`) — detected columns + row count + preview table + spinner/error states. Validated both formats parse (Node smoke test). Added `xlsx` dep. |
+| Jul 15, 2026 | **Feedback pass** started (commit `7c0981f`): default landing = **Dashboard** (`/` → `/dashboard`); Chat moved to **`/assistant`** (end of flow); sidebar reordered to the customer-journey sequence. Per class/prof feedback (`Group Project/Feedbacks on SmartOps.docx`). API seam untouched. **Note:** Ahmer's backend connection is not in this repo — verified our repo + live deploy are still the mock. |
 | Jul 11, 2026 | **Enhancement Batch 3** (commits `0d8b3c3`, `e294315`): uploaded file now **drives the Dashboard** — new `lib/mapping.ts` (auto-detect columns), `lib/analytics.ts` (`computeDashboard`), `lib/store.ts` (zustand, persisted); Onboarding column-mapping UI + currency; Dashboard renders sample-or-uploaded via `useDashboardData()` with banner/reset/empty-states. Plus **Excel + PDF export** (`lib/export.ts`, +`jspdf`/`jspdf-autotable`). Verified: analytics + export via Node, typecheck, build, live. |
 
 ---
