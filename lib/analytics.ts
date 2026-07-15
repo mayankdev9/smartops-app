@@ -27,6 +27,31 @@ export interface DashboardData {
 
 const ABC_COLORS = ["#1d4ed8", "#60a5fa", "#cbd5e1"];
 
+// Overall "business health" for the dashboard hero (big-picture-first).
+export function businessHealth(d: DashboardData): {
+  label: string;
+  tone: "good" | "warn" | "urgent";
+  summary: string;
+} {
+  const critical = d.stockoutRisks.filter((s) => s.daysLeft < 2.5).length;
+  const atRisk = d.stockoutRisks.length;
+  if (critical > 0) {
+    return {
+      label: "Action needed",
+      tone: "urgent",
+      summary: `${critical} SKU${critical > 1 ? "s" : ""} will stock out within days — reorder now.`,
+    };
+  }
+  if (atRisk > 0) {
+    return {
+      label: "Watch",
+      tone: "warn",
+      summary: `${atRisk} SKU${atRisk > 1 ? "s" : ""} approaching the reorder point this week.`,
+    };
+  }
+  return { label: "Healthy", tone: "good", summary: "No urgent stock issues — inventory looks well managed." };
+}
+
 interface Item {
   name: string;
   sold: number;

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import {
   Area,
@@ -14,11 +15,18 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { AlertTriangle, ArrowRight, Database, FileSpreadsheet, FileText, Package, RefreshCw, Snowflake, Sparkles, TrendingUp, Upload } from "lucide-react";
+import { Activity, AlertTriangle, ArrowRight, ChevronRight, Database, FileSpreadsheet, FileText, Package, RefreshCw, Snowflake, Sparkles, TrendingUp, Upload } from "lucide-react";
 import type { Insight } from "@/lib/data";
-import type { KpiCard as KpiCardData } from "@/lib/analytics";
+import { businessHealth, type KpiCard as KpiCardData } from "@/lib/analytics";
 import { useDashboardData, useDataStore } from "@/lib/store";
 import { exportExcel, exportPdf } from "@/lib/export";
+import SkuDrawer, { type SkuDetail } from "@/components/SkuDrawer";
+
+const HEALTH_STYLES: Record<"good" | "warn" | "urgent", { bg: string; ring: string; text: string; dot: string }> = {
+  good: { bg: "bg-emerald-50", ring: "ring-emerald-200", text: "text-emerald-700", dot: "bg-emerald-500" },
+  warn: { bg: "bg-amber-50", ring: "ring-amber-200", text: "text-amber-700", dot: "bg-amber-500" },
+  urgent: { bg: "bg-red-50", ring: "ring-red-200", text: "text-red-700", dot: "bg-red-500" },
+};
 
 const INSIGHT_STYLES: Record<Insight["tone"], { bar: string; chip: string; icon: React.ReactNode }> = {
   urgent: { bar: "border-l-red-500", chip: "bg-red-50 text-red-700", icon: <AlertTriangle size={15} /> },
@@ -77,6 +85,10 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 export default function DashboardPage() {
   const d = useDashboardData();
   const clear = useDataStore((s) => s.clear);
+  const [selectedSku, setSelectedSku] = useState<SkuDetail | null>(null);
+  const health = businessHealth(d);
+  const hs = HEALTH_STYLES[health.tone];
+  const topAction = d.insights.find((i) => i.tone === "urgent") ?? d.insights[0];
 
   return (
     <div className="h-full overflow-y-auto bg-slate-50">
@@ -105,6 +117,34 @@ export default function DashboardPage() {
       </header>
 
       <div className="mx-auto max-w-5xl space-y-5 p-6">
+        {/* Business health — big picture first */}
+        <div className={`rounded-2xl ${hs.bg} p-5 ring-1 ${hs.ring}`}>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className={`flex h-11 w-11 items-center justify-center rounded-xl bg-white ${hs.text}`}>
+                <Activity size={22} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className={`h-2.5 w-2.5 rounded-full ${hs.dot}`} />
+                  <span className={`text-xs font-bold uppercase tracking-wide ${hs.text}`}>{health.label}</span>
+                </div>
+                <p className="text-lg font-bold leading-tight text-slate-900">Business health</p>
+                <p className="text-sm text-slate-600">{health.summary}</p>
+              </div>
+            </div>
+            {topAction && (
+              <div className="rounded-xl bg-white/70 px-4 py-3">
+                <p className="text-xs font-medium text-slate-400">Top priority</p>
+                <p className="text-sm font-semibold text-slate-800">{topAction.title}</p>
+                <p className="mt-0.5 inline-flex items-center gap-1 text-xs font-medium text-brand">
+                  <ArrowRight size={12} /> {topAction.action}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Data source banner */}
         {d.isSample ? (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-2.5 text-sm">
@@ -230,16 +270,33 @@ export default function DashboardPage() {
 
           <Card title="Reorder now">
             {d.stockoutRisks.length > 0 ? (
-              <ul className="space-y-3">
+              <ul className="space-y-1">
                 {d.stockoutRisks.map((s) => (
-                  <li key={s.sku} className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-slate-800">{s.sku}</p>
-                      <p className="text-xs text-slate-500">{s.onHand} on hand · {s.dailySales}/day</p>
-                    </div>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${s.daysLeft < 2.5 ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-700"}`}>
-                      {s.daysLeft}d left
-                    </span>
+                  <li key={s.sku}>
+                    <button
+                      onClick={() =>
+                        setSelectedSku({
+                          sku: s.sku,
+                          context: "Stockout risk",
+                          onHand: s.onHand,
+                          dailySales: s.dailySales,
+                          daysLeft: s.daysLeft,
+                          reorder: s.reorder,
+                        })
+                      }
+                      className="-mx-2 flex w-full items-center justify-between rounded-lg px-2 py-2 text-left transition hover:bg-slate-50"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-slate-800">{s.sku}</p>
+                        <p className="text-xs text-slate-500">{s.onHand} on hand · {s.dailySales}/day</p>
+                      </div>
+                      <span className="flex items-center gap-1">
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${s.daysLeft < 2.5 ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-700"}`}>
+                          {s.daysLeft}d left
+                        </span>
+                        <ChevronRight size={15} className="text-slate-300" />
+                      </span>
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -264,7 +321,19 @@ export default function DashboardPage() {
                 </thead>
                 <tbody>
                   {d.slowMovers.map((m) => (
-                    <tr key={m.sku} className="border-t border-slate-100">
+                    <tr
+                      key={m.sku}
+                      onClick={() =>
+                        setSelectedSku({
+                          sku: m.sku,
+                          context: "Slow-mover",
+                          units: m.units,
+                          value: m.value,
+                          note: m.daysIdle > 0 ? `Idle for ${m.daysIdle} days.` : "Among your lowest-selling stock.",
+                        })
+                      }
+                      className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50"
+                    >
                       <td className="py-2 font-medium text-slate-800">{m.sku}</td>
                       <td className="py-2 text-slate-600">{m.units}</td>
                       <td className="py-2 text-slate-600">{m.value}</td>
@@ -283,6 +352,8 @@ export default function DashboardPage() {
           )}
         </Card>
       </div>
+
+      <SkuDrawer sku={selectedSku} onClose={() => setSelectedSku(null)} />
     </div>
   );
 }
