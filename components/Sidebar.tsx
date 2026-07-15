@@ -6,11 +6,13 @@ import { usePathname } from "next/navigation";
 import { BadgeCheck, Bell, LayoutDashboard, Menu, MessageSquare, Settings, X, Zap } from "lucide-react";
 import { business } from "@/lib/data";
 
+// Customer-journey order (per professor feedback): start on the Dashboard for
+// overall business status, drill into details, and reach the Assistant last.
 const NAV = [
-  { href: "/", label: "Assistant", icon: MessageSquare },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/alerts", label: "Daily Alert", icon: Bell },
   { href: "/onboarding", label: "Setup & Data", icon: Settings },
+  { href: "/assistant", label: "Assistant", icon: MessageSquare },
 ];
 
 function Brand() {

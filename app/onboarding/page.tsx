@@ -298,7 +298,7 @@ export default function OnboardingPage() {
                 are ready.
               </p>
               <button
-                onClick={() => router.push("/")}
+                onClick={() => router.push("/assistant")}
                 className="mt-6 flex items-center gap-2 rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark"
               >
                 <Sparkles size={16} /> Ask your first question
