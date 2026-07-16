@@ -377,9 +377,12 @@ Ahmer decoupled his pipeline into a standalone **FastAPI** repo (`github.com/ahm
 
 ### ⚠️ TODO / follow-ups
 - **🔑 ROTATE THE API KEYS** (still open) — both keys were shown in a Render screenshot during setup. Regenerate Anthropic (console.anthropic.com) + OpenAI (platform.openai.com), update the two values in Render → Environment.
+- **Brief Ahmer on backend changes** (still open) — Critic fix (what he asked for) + length-cap removal + template relaxation, all in the fork + live on Render. Draft WhatsApp message was prepared; his call if he wants lengths tuned differently.
 - **Retire `smartops-app-five.vercel.app`** (Ahmer's old separate deploy) — everyone uses `smartops-agent` now.
-- **Done Jul 15:** feedback batch 1 (landing/flow), batch 2 (interactive dashboard + business health), batch 4 (repositioning to "AI General Manager"), tuned suggested prompts to the live backend.
+- **Done Jul 15 (front-end):** feedback batch 1 (landing/flow), batch 2 (interactive dashboard + business health), batch 4 (repositioning to "AI General Manager"), tuned suggested prompts to the live backend.
+- **Done Jul 15 (backend, in fork):** Critic re-validation fix (badge works), length caps removed, format template relaxed — all verified live end-to-end.
 - **Still to do:** feedback **batch 3** — Alerts page (colorful redesign + critical/normal prioritization + "Generate PO") — and a **Help/FAQ** support surface.
+- **⏸ PAUSED (Jul 15 evening):** Mayank has additional feedback to give on resume — **ask him for it first thing next session.**
 - Render **Standard is ~$25/mo**; if optimizing later, convert the 30 MB Excel to parquet/csv so it fits a smaller instance.
 - **Resume feedback batch 3** (Alerts redesign + Generate PO) + add a **Help/FAQ** — the last of the class/prof feedback. (Batch 4 repositioning already done.)
 
