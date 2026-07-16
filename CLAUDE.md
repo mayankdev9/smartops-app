@@ -358,10 +358,27 @@ Match these when adding to the app so it stays consistent:
 
 ---
 
-## ▶ STATUS (Jul 15, 2026 — CONSOLIDATED: real backend wired to the new UI)
+## ▶ STATUS (Jul 16, 2026 — feedback round 2 shipped; PAUSED)
 
 ✅ **ONE canonical version:** `github.com/mayankdev9/smartops-app` → **https://smartops-agent.vercel.app**
-= our **new UI** + **Ahmer's real 5-LLM + Critic backend**. The divergence is resolved.
+= our **new UI** + **Ahmer's real 5-LLM + Critic backend**. Backend fork: `github.com/mayankdev9/smartops-backend` → Render `smartops-backend-mwof.onrender.com`.
+
+### Shipped Jul 16 (this session) — all live
+- **Alerts redesign** (`eca7f44`): removed the digest/messages UI → full-screen grid of 8 clickable alert-category tiles (Generate PO, Stock-outs, Slow-movers, Fast-movers, Shipping, Returns, Payments, Margins), priority color-coding, real **Generate PO** PDF. Data-driven tiles derive from the live dashboard data.
+- **Help & FAQ page** (`3c30b65`): new `/help` tab — support options + accordion FAQ.
+- **Onboarding "close the loop"** (`5b71218`): "biggest headache" question + a **Diagnosis** final step (business health + computed findings/recommendations). Closes the professor's onboarding ask.
+- **Assistant charts** (`30fff94`): renders the backend's chart JSON (Recharts bar/line). Ahmer's "new backend" = only the cap-removal we already have; **our fork is ahead** (also has the Critic fix). Charts were always emitted; just weren't rendered.
+- **Moderate answer caps re-added** (backend fork `3ba7d88`): `max_tokens 2000→700`, data `8000→6000`, "concise but comprehensive" prompt. Verified broad answers ~150 words, charts intact.
+- **Onboarding: empty default company name** (`3665245`).
+- **Assistant reflects uploaded data** (`5447477`): FE sends `businessContext`; backend already supported it (no backend change). Closes the last feedback-audit gap.
+
+### Feedback audit — essentially complete
+All structural/UX + Alerts + support + onboarding-loop + assistant-uploaded-data items are **done**. Remaining is polish-level: richer per-upload aggregates (geo/channel/returns for uploaded files), true drag-and-drop, QuickBooks import (out of scope), Shopify (skipped). The multi-tenant **company accounts + shared data warehouse is the big "do last"** item.
+
+### ⏸ PAUSED (Jul 16) — resume notes
+- Everything committed, deployed, docs synced. Nothing half-done.
+- **On resume, likely next:** multi-tenant company accounts + shared data (the "do last" item), or richer upload analytics so uploaded-data assistant answers cover geography/channels/returns.
+- Open housekeeping (unchanged): **rotate API keys** (screenshot-exposed), **brief Ahmer** on backend changes, **retire `smartops-app-five`**.
 
 ### How the backend got connected (Jul 15)
 Ahmer decoupled his pipeline into a standalone **FastAPI** repo (`github.com/ahmer64-sketch/smartops-backend`, `POST /assistant`) that matches our contract exactly. Steps taken:
