@@ -4,24 +4,39 @@ import { getMockResponse } from "@/lib/mock";
 /**
  * THE INTEGRATION SEAM.
  *
- * The whole front-end talks to this ONE endpoint. Today it returns a mock
- * (lib/mock.ts). When Ahmer's real 5-LLM + Critic pipeline is ready, swap the
- * body of this handler for ONE of the two options below — the Chat UI never
- * changes because the response shape stays identical.
+ * The whole front-end talks to this ONE endpoint.
  *
- * Contract:
+ * Contract (matches Ahmer's FastAPI backend `POST /assistant` exactly):
  *   POST /api/assistant
  *     →  { message: string, history: Msg[], businessContext: object }
- *     ←  { answer: string, criticValidated: boolean, toolUsed: string, latencyMs: number }
+ *     ←  { answer: string, criticValidated: boolean, toolUsed: string, latencyMs: number, chart?: unknown }
+ *
+ * Behaviour:
+ *   - If ASSISTANT_BACKEND_URL is set → PROXY to Ahmer's real 5-LLM + Critic
+ *     pipeline (repo: github.com/ahmer64-sketch/smartops-backend, `server.py`).
+ *   - Otherwise → fall back to the local mock (lib/mock.ts) so dev/preview works
+ *     with no backend running.
+ *
+ * Ahmer's pipeline can take ~10s, so we allow a longer function duration.
  */
+
+export const maxDuration = 60;
 
 export interface Msg {
   role: "user" | "assistant";
   content: string;
 }
 
+interface AssistantResponse {
+  answer: string;
+  criticValidated: boolean;
+  toolUsed: string;
+  latencyMs: number;
+  chart?: unknown;
+}
+
 export async function POST(req: NextRequest) {
-  const { message } = (await req.json()) as {
+  const { message, history = [], businessContext = {} } = (await req.json()) as {
     message: string;
     history?: Msg[];
     businessContext?: Record<string, unknown>;
@@ -32,29 +47,46 @@ export async function POST(req: NextRequest) {
   }
 
   const started = Date.now();
+  const backendUrl = process.env.ASSISTANT_BACKEND_URL;
 
-  // ── CURRENT: mock pipeline ────────────────────────────────────────────────
+  // ── Ahmer's real backend (proxy) ──────────────────────────────────────────
+  if (backendUrl) {
+    try {
+      const res = await fetch(backendUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message, history, businessContext }),
+        signal: AbortSignal.timeout(55000),
+      });
+      if (!res.ok) throw new Error(`backend responded ${res.status}`);
+      const data = (await res.json()) as Partial<AssistantResponse>;
+      return NextResponse.json({
+        answer: data.answer ?? "No answer was returned.",
+        criticValidated: data.criticValidated ?? false,
+        toolUsed: data.toolUsed ?? "general",
+        chart: data.chart ?? null,
+        latencyMs: typeof data.latencyMs === "number" ? data.latencyMs : Date.now() - started,
+      } satisfies AssistantResponse);
+    } catch (err) {
+      // Don't hard-fail the UI if the backend is down — return a friendly message.
+      return NextResponse.json({
+        answer:
+          "⚠️ The assistant is temporarily unavailable. Please try again in a moment.",
+        criticValidated: false,
+        toolUsed: "general",
+        latencyMs: Date.now() - started,
+        error: err instanceof Error ? err.message : "backend error",
+      });
+    }
+  }
+
+  // ── Local mock fallback (no backend configured) ───────────────────────────
   const mock = getMockResponse(message);
-  // Simulate the pipeline's thinking time so the UI's latency/typing feel real.
   await new Promise((r) => setTimeout(r, mock.latencyMs));
-
   return NextResponse.json({
     answer: mock.answer,
     criticValidated: mock.criticValidated,
     toolUsed: mock.toolUsed,
     latencyMs: Date.now() - started,
   });
-
-  // ── LATER, OPTION 1: Ahmer's LLM runs inside this route (JS/TS) ────────────
-  // const result = await ahmerPipeline({ message, history, businessContext });
-  // return NextResponse.json({ ...result, latencyMs: Date.now() - started });
-  //
-  // ── LATER, OPTION 2: Ahmer's LLM is a separate service — proxy to it ───────
-  // const res = await fetch(process.env.ASSISTANT_BACKEND_URL!, {
-  //   method: "POST",
-  //   headers: { "Content-Type": "application/json" },
-  //   body: JSON.stringify({ message, history, businessContext }),
-  // });
-  // const data = await res.json();
-  // return NextResponse.json({ ...data, latencyMs: Date.now() - started });
 }
