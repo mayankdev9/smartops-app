@@ -2,15 +2,28 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, Check, FileSpreadsheet, Loader2, MessageCircle, Sparkles, Upload } from "lucide-react";
+import { Activity, AlertCircle, ArrowRight, Check, FileSpreadsheet, Loader2, MessageCircle, Sparkles, Upload } from "lucide-react";
 import { business } from "@/lib/data";
 import { parseUpload, type ParsedUpload } from "@/lib/parseUpload";
 import { autoDetectMapping, FIELDS, isMappingValid, type Mapping } from "@/lib/mapping";
-import { computeDashboard } from "@/lib/analytics";
-import { useDataStore } from "@/lib/store";
+import { businessHealth, computeDashboard } from "@/lib/analytics";
+import { useDashboardData, useDataStore } from "@/lib/store";
 
-const STEPS = ["Business", "Connect data", "Done"];
+const STEPS = ["Business", "Connect data", "Diagnosis"];
 const CURRENCIES = ["₹", "$", "€", "£"];
+const CONCERNS = [
+  "Running out of stock",
+  "Slow-moving stock / cash stuck",
+  "Too many returns",
+  "Not knowing what's selling",
+  "Cash flow",
+  "Not sure yet",
+];
+const HEALTH_STYLES = {
+  good: { bg: "bg-emerald-50", ring: "ring-emerald-200", text: "text-emerald-700", dot: "bg-emerald-500" },
+  warn: { bg: "bg-amber-50", ring: "ring-amber-200", text: "text-amber-700", dot: "bg-amber-500" },
+  urgent: { bg: "bg-red-50", ring: "ring-red-200", text: "text-red-700", dot: "bg-red-500" },
+} as const;
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -25,6 +38,10 @@ export default function OnboardingPage() {
   const [parsing, setParsing] = useState(false);
   const [mapping, setMapping] = useState<Mapping>({});
   const [currency, setCurrency] = useState("₹");
+  const [concern, setConcern] = useState("");
+  const d = useDashboardData();
+  const health = businessHealth(d);
+  const healthStyle = HEALTH_STYLES[health.tone];
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -111,6 +128,23 @@ export default function OnboardingPage() {
                 </select>
               </div>
               <Field label="Approx. number of SKUs" value={skus} onChange={setSkus} type="number" />
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">What&apos;s your biggest operational headache right now?</label>
+                <div className="flex flex-wrap gap-2">
+                  {CONCERNS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setConcern(c)}
+                      className={`rounded-full border px-3 py-1.5 text-sm transition ${
+                        concern === c ? "border-brand bg-blue-50 text-brand" : "border-slate-300 text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <button
                 onClick={() => setStep(1)}
                 className="mt-2 w-full rounded-lg bg-brand py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark"
@@ -288,21 +322,70 @@ export default function OnboardingPage() {
           )}
 
           {step === 2 && (
-            <div className="flex flex-col items-center py-6 text-center">
-              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500 text-white">
-                <Check size={30} />
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand text-white">
+                  <Activity size={22} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Here&apos;s what SmartOps found, {name.split(" ")[0]}</h3>
+                  <p className="text-sm text-slate-500">
+                    {d.isSample
+                      ? "Based on sample data — upload your file for a read on your own numbers."
+                      : `A first read on ${d.source}.`}
+                  </p>
+                </div>
               </div>
-              <h3 className="text-lg font-bold text-slate-900">You&apos;re all set, {name.split(" ")[0]}!</h3>
-              <p className="mt-1 max-w-sm text-sm text-slate-500">
-                SmartOps is analyzing your data. Your first Critic-validated answers and your 8 AM digest
-                are ready.
-              </p>
-              <button
-                onClick={() => router.push("/assistant")}
-                className="mt-6 flex items-center gap-2 rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark"
-              >
-                <Sparkles size={16} /> Ask your first question
-              </button>
+
+              {concern && (
+                <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                  You told us your biggest headache is{" "}
+                  <span className="font-semibold text-slate-800">{concern.toLowerCase()}</span>. Here&apos;s where
+                  that stands, plus what else needs your attention.
+                </p>
+              )}
+
+              {/* Business health */}
+              <div className={`rounded-xl p-4 ring-1 ${healthStyle.bg} ${healthStyle.ring}`}>
+                <div className="flex items-center gap-2">
+                  <span className={`h-2.5 w-2.5 rounded-full ${healthStyle.dot}`} />
+                  <span className={`text-xs font-bold uppercase tracking-wide ${healthStyle.text}`}>{health.label}</span>
+                </div>
+                <p className="mt-1 text-sm text-slate-700">{health.summary}</p>
+              </div>
+
+              {/* Findings + recommendations */}
+              {d.insights.length > 0 && (
+                <div>
+                  <p className="mb-2 text-sm font-semibold text-slate-800">What we found, and what to do</p>
+                  <div className="space-y-2">
+                    {d.insights.map((ins, i) => (
+                      <div key={i} className="rounded-lg border border-slate-200 p-3">
+                        <p className="text-sm font-semibold text-slate-800">{ins.title}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">{ins.detail}</p>
+                        <p className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-brand">
+                          <ArrowRight size={12} /> {ins.action}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => router.push("/dashboard")}
+                  className="flex-1 rounded-lg bg-brand py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark"
+                >
+                  See full dashboard
+                </button>
+                <button
+                  onClick={() => router.push("/assistant")}
+                  className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+                >
+                  <Sparkles size={15} /> Ask the assistant
+                </button>
+              </div>
             </div>
           )}
         </div>
