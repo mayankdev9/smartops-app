@@ -10,7 +10,7 @@ import { business } from "@/lib/data";
 // overall business status, drill into details, and reach the Assistant last.
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/alerts", label: "Daily Alert", icon: Bell },
+  { href: "/alerts", label: "Alerts", icon: Bell },
   { href: "/onboarding", label: "Setup & Data", icon: Settings },
   { href: "/assistant", label: "Assistant", icon: MessageSquare },
 ];

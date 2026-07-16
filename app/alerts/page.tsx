@@ -1,178 +1,168 @@
 "use client";
 
 import { useState } from "react";
-import { BadgeCheck, Clock, Mail, MessageCircle } from "lucide-react";
-import { business, kpis, stockoutRisks } from "@/lib/data";
+import {
+  AlertTriangle, ChevronRight, ClipboardList, CreditCard, Percent, RotateCcw,
+  Snowflake, TrendingUp, Truck, X,
+} from "lucide-react";
+import { useDashboardData } from "@/lib/store";
+import {
+  buildAlertCategories, priorityCounts, sortByPriority, topPriority,
+  type AlertCategory, type CategoryIcon, type Priority,
+} from "@/lib/alerts";
+import { exportPO } from "@/lib/export";
 
-type Channel = "whatsapp" | "email";
+const ICONS: Record<CategoryIcon, React.ReactNode> = {
+  po: <ClipboardList size={22} />,
+  stockout: <AlertTriangle size={22} />,
+  slow: <Snowflake size={22} />,
+  demand: <TrendingUp size={22} />,
+  shipping: <Truck size={22} />,
+  returns: <RotateCcw size={22} />,
+  payments: <CreditCard size={22} />,
+  margins: <Percent size={22} />,
+};
+
+const P: Record<Priority, { dot: string; chip: string; label: string; accent: string }> = {
+  critical: { dot: "bg-red-500", chip: "bg-red-50 text-red-700", label: "Critical", accent: "border-l-red-500" },
+  high: { dot: "bg-amber-500", chip: "bg-amber-50 text-amber-700", label: "High", accent: "border-l-amber-500" },
+  normal: { dot: "bg-slate-400", chip: "bg-slate-100 text-slate-600", label: "Normal", accent: "border-l-slate-300" },
+};
+
+function Tile({ cat, onClick }: { cat: AlertCategory; onClick: () => void }) {
+  const c = priorityCounts(cat.alerts);
+  const tp = topPriority(cat.alerts);
+  const empty = cat.alerts.length === 0;
+  return (
+    <button
+      onClick={onClick}
+      disabled={empty}
+      className={`flex h-full flex-col rounded-xl border border-l-4 border-slate-200 bg-white p-4 text-left transition hover:shadow-md disabled:opacity-60 ${
+        empty ? "border-l-slate-200" : P[tp].accent
+      }`}
+    >
+      <div className="mb-3 flex items-start justify-between">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+          {ICONS[cat.icon]}
+        </div>
+        <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${cat.dataDriven ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+          {cat.dataDriven ? "from your data" : "sample"}
+        </span>
+      </div>
+      <p className="text-sm font-semibold text-slate-900">{cat.name}</p>
+      <p className="mt-0.5 text-2xl font-bold text-slate-900">{cat.alerts.length}</p>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        {c.critical > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700"><span className="h-1.5 w-1.5 rounded-full bg-red-500" />{c.critical} critical</span>}
+        {c.high > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" />{c.high} high</span>}
+        {c.critical === 0 && c.high === 0 && <span className="text-[11px] text-slate-400">{empty ? "No alerts" : "All normal"}</span>}
+      </div>
+      {!empty && (
+        <div className="mt-3 flex items-center gap-1 text-xs font-medium text-brand">
+          View <ChevronRight size={13} />
+        </div>
+      )}
+    </button>
+  );
+}
+
+function CategoryDrawer({ cat, currency, onClose }: { cat: AlertCategory; currency: string; onClose: () => void }) {
+  void currency;
+  const alerts = sortByPriority(cat.alerts);
+  const poLines = cat.alerts.filter((a) => a.reorder !== undefined).map((a) => ({ sku: a.sku ?? "SKU", reorder: a.reorder! }));
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+      <aside className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-white shadow-xl">
+        <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-600">{ICONS[cat.icon]}</div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">{cat.name}</h3>
+              <p className="text-xs text-slate-500">{cat.alerts.length} alert{cat.alerts.length === 1 ? "" : "s"}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Close">
+            <X size={20} />
+          </button>
+        </div>
+
+        {cat.id === "po" && poLines.length > 0 && (
+          <div className="border-b border-slate-100 px-5 py-3">
+            <button
+              onClick={() => exportPO(poLines)}
+              className="w-full rounded-lg bg-brand py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark"
+            >
+              Generate PO for all {poLines.length} items
+            </button>
+          </div>
+        )}
+
+        <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
+          {alerts.map((a) => (
+            <div key={a.id} className={`rounded-xl border border-l-4 border-slate-200 bg-white p-3 ${P[a.priority].accent}`}>
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${P[a.priority].chip}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${P[a.priority].dot}`} />
+                  {P[a.priority].label}
+                </span>
+                {a.reorder !== undefined && (
+                  <button
+                    onClick={() => exportPO([{ sku: a.sku ?? "SKU", reorder: a.reorder! }])}
+                    className="rounded-lg border border-brand px-2.5 py-1 text-xs font-semibold text-brand transition hover:bg-blue-50"
+                  >
+                    Generate PO
+                  </button>
+                )}
+              </div>
+              <p className="text-sm font-semibold text-slate-800">{a.title}</p>
+              <p className="mt-0.5 text-xs text-slate-500">{a.detail}</p>
+            </div>
+          ))}
+        </div>
+      </aside>
+    </div>
+  );
+}
 
 export default function AlertsPage() {
-  const [channel, setChannel] = useState<Channel>("whatsapp");
+  const d = useDashboardData();
+  const categories = buildAlertCategories(d);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const open = categories.find((c) => c.id === openId) ?? null;
 
-  const urgent = stockoutRisks[0];
+  const totalAlerts = categories.reduce((n, c) => n + c.alerts.length, 0);
+  const totalCritical = categories.reduce((n, c) => n + priorityCounts(c.alerts).critical, 0);
 
   return (
     <div className="h-full overflow-y-auto bg-slate-50">
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3.5">
         <div>
-          <h2 className="text-[15px] font-bold leading-tight text-slate-900">Daily Alert</h2>
-          <p className="text-xs leading-tight text-slate-500">Your 8:00 AM operations digest</p>
+          <h2 className="text-[15px] font-bold leading-tight text-slate-900">Alerts</h2>
+          <p className="text-xs leading-tight text-slate-500">
+            {totalAlerts} alerts across {categories.length} areas
+            {totalCritical > 0 ? `, ${totalCritical} critical` : ""}
+          </p>
         </div>
-        <div className="flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-          <Clock size={14} /> Sent daily at 8:00 AM
-        </div>
+        {totalCritical > 0 && (
+          <span className="flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">
+            <AlertTriangle size={14} /> {totalCritical} need action now
+          </span>
+        )}
       </header>
 
-      <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 p-6 lg:grid-cols-5">
-        {/* Preview */}
-        <div className="lg:col-span-3">
-          {/* Channel toggle */}
-          <div className="mb-4 inline-flex rounded-lg border border-slate-200 bg-white p-1">
-            <button
-              onClick={() => setChannel("whatsapp")}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition ${
-                channel === "whatsapp" ? "bg-emerald-500 text-white" : "text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              <MessageCircle size={15} /> WhatsApp
-            </button>
-            <button
-              onClick={() => setChannel("email")}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition ${
-                channel === "email" ? "bg-brand text-white" : "text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              <Mail size={15} /> Email
-            </button>
-          </div>
-
-          {channel === "whatsapp" ? (
-            <WhatsAppPreview urgentSku={urgent.sku} urgentDays={urgent.daysLeft} />
-          ) : (
-            <EmailPreview />
-          )}
+      <div className="mx-auto max-w-5xl p-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {categories.map((cat) => (
+            <Tile key={cat.id} cat={cat} onClick={() => setOpenId(cat.id)} />
+          ))}
         </div>
-
-        {/* Delivery settings */}
-        <div className="lg:col-span-2">
-          <div className="rounded-xl border border-slate-200 bg-white p-5">
-            <h3 className="mb-4 text-sm font-semibold text-slate-800">Delivery settings</h3>
-            <div className="space-y-4 text-sm">
-              <Row label="Send time" value="8:00 AM daily" />
-              <Row label="WhatsApp" value={`+91 ●●●●● ${"12345".slice(-5)}`} on />
-              <Row label="Email" value={`owner@sharmatrading.in`} on />
-              <Row label="Include" value="Stockouts · KPIs · Top action" />
-            </div>
-            <div className="mt-5 rounded-lg bg-emerald-50 p-3">
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
-                <BadgeCheck size={14} /> Every digest is Critic-validated
-              </div>
-              <p className="mt-1 text-xs text-emerald-700/80">
-                Numbers are checked before the message goes out — no bad data reaches the owner.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Row({ label, value, on }: { label: string; value: string; on?: boolean }) {
-  return (
-    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-      <span className="text-slate-500">{label}</span>
-      <span className="flex items-center gap-2 font-medium text-slate-800">
-        {value}
-        {on && <span className="h-2 w-2 rounded-full bg-emerald-500" />}
-      </span>
-    </div>
-  );
-}
-
-function WhatsAppPreview({ urgentSku, urgentDays }: { urgentSku: string; urgentDays: number }) {
-  return (
-    <div className="mx-auto max-w-sm overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
-      {/* WhatsApp header */}
-      <div className="flex items-center gap-3 bg-emerald-600 px-4 py-3 text-white">
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-sm font-bold">SO</div>
-        <div>
-          <p className="text-sm font-semibold">SmartOps</p>
-          <p className="text-xs text-emerald-100">Business account</p>
-        </div>
-      </div>
-      {/* Chat area */}
-      <div className="space-y-2 bg-[#e5ddd5] p-4" style={{ minHeight: 380 }}>
-        <div className="mx-auto w-fit rounded-full bg-white/70 px-3 py-0.5 text-[11px] text-slate-500">
-          Today, 8:00 AM
-        </div>
-        <div className="max-w-[88%] rounded-lg rounded-tl-sm bg-white p-3 text-[13px] leading-relaxed text-slate-800 shadow-sm">
-          <p className="font-semibold">☀️ Good morning, {business.name.split(" ")[0]}!</p>
-          <p className="mt-1">Here&apos;s your operations summary for today:</p>
-          <p className="mt-2 font-semibold text-red-600">🚨 Reorder today</p>
-          <p>
-            <b>{urgentSku}</b> runs out in <b>{urgentDays} days</b>. Place your order now to avoid weekend
-            stockout.
-          </p>
-          <p className="mt-2 font-semibold text-slate-700">📊 Yesterday</p>
-          <p>
-            Revenue <b>{kpis.revenue30d}</b> (30d, ↑{kpis.revenueDeltaPct}%) · {kpis.stockoutRiskCount} SKUs
-            at risk · turns {kpis.inventoryTurns}×
-          </p>
-          <p className="mt-2 font-semibold text-slate-700">✅ One thing to do</p>
-          <p>Reorder your 3 at-risk SKUs before noon.</p>
-          <div className="mt-2 flex items-center justify-end gap-1 text-[11px] text-emerald-600">
-            <BadgeCheck size={12} /> Critic validated · 8:00 AM
-          </div>
-        </div>
-        <div className="max-w-[88%] rounded-lg rounded-tl-sm bg-white p-3 text-[13px] text-slate-800 shadow-sm">
-          Reply <b>&quot;details&quot;</b> for the full stockout list, or ask me anything.
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function EmailPreview() {
-  return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-100 px-5 py-3">
-        <p className="text-xs text-slate-400">From: SmartOps &lt;alerts@smartops.ai&gt;</p>
-        <p className="text-sm font-semibold text-slate-900">
-          ☀️ Your 8 AM Operations Digest — {kpis.stockoutRiskCount} SKUs need attention
+        <p className="mt-4 text-center text-xs text-slate-400">
+          Tiles marked “from your data” are computed from your uploaded file; the rest are sample alerts for the prototype.
         </p>
       </div>
-      <div className="space-y-4 px-5 py-4 text-sm text-slate-700">
-        <p>Good morning {business.owner.split(" ")[0]},</p>
-        <div className="rounded-lg border border-red-100 bg-red-50 p-3">
-          <p className="font-semibold text-red-700">🚨 Reorder today</p>
-          <ul className="mt-1 list-disc space-y-0.5 pl-5">
-            {stockoutRisks.map((s) => (
-              <li key={s.sku}>
-                <b>{s.sku}</b> — {s.daysLeft}d left, reorder {s.reorder} units
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          <Metric label="Revenue (30d)" value={kpis.revenue30d} />
-          <Metric label="Inventory turns" value={`${kpis.inventoryTurns}×`} />
-          <Metric label="Frozen capital" value={kpis.frozenCapital} />
-        </div>
-        <p className="text-xs text-slate-400">
-          <BadgeCheck size={12} className="mr-1 inline" />
-          Every figure in this email was Critic-validated before sending.
-        </p>
-      </div>
-    </div>
-  );
-}
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg bg-slate-50 p-3 text-center">
-      <p className="text-lg font-bold text-slate-900">{value}</p>
-      <p className="text-[11px] text-slate-500">{label}</p>
+      {open && <CategoryDrawer cat={open} currency={d.currency} onClose={() => setOpenId(null)} />}
     </div>
   );
 }
