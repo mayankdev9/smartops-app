@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BadgeCheck, Bell, LayoutDashboard, Menu, MessageSquare, Settings, X, Zap } from "lucide-react";
+import { BadgeCheck, Bell, HelpCircle, LayoutDashboard, Menu, MessageSquare, Settings, X, Zap } from "lucide-react";
 import { business } from "@/lib/data";
 
 // Customer-journey order (per professor feedback): start on the Dashboard for
@@ -13,6 +13,7 @@ const NAV = [
   { href: "/alerts", label: "Alerts", icon: Bell },
   { href: "/onboarding", label: "Setup & Data", icon: Settings },
   { href: "/assistant", label: "Assistant", icon: MessageSquare },
+  { href: "/help", label: "Help", icon: HelpCircle },
 ];
 
 function Brand() {
