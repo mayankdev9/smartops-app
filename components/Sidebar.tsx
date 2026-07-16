@@ -23,7 +23,7 @@ function Brand() {
       </div>
       <div>
         <h1 className="text-[15px] font-bold leading-tight text-slate-900">SmartOps</h1>
-        <p className="text-xs leading-tight text-slate-500">Operations AI Agent</p>
+        <p className="text-xs leading-tight text-slate-500">AI General Manager</p>
       </div>
     </div>
   );

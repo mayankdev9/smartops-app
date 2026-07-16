@@ -119,7 +119,7 @@ export default function ChatPage() {
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3.5">
         <div>
           <h2 className="text-[15px] font-bold leading-tight text-slate-900">Assistant</h2>
-          <p className="text-xs leading-tight text-slate-500">Ask your operations anything, in plain English</p>
+          <p className="text-xs leading-tight text-slate-500">Diagnoses and fixes your operations — in plain English</p>
         </div>
         <div className="flex items-center gap-2">
           {messages.length > 0 && (
@@ -146,10 +146,10 @@ export default function ChatPage() {
               <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-white">
                 <Sparkles size={28} />
               </div>
-              <h2 className="text-2xl font-bold text-slate-900">Ask your operations anything</h2>
+              <h2 className="text-2xl font-bold text-slate-900">Your AI General Manager</h2>
               <p className="mt-2 max-w-md text-slate-500">
-                Plain-English answers about stock, demand, and cash — pulled from your data and checked
-                by the Critic before you see them.
+                Runs your operations, flags what&apos;s urgent, and tells you what to do next — every
+                answer validated by the Critic before you act.
               </p>
               <div className="mt-8 flex w-full max-w-lg flex-col gap-2">
                 {SUGGESTIONS.map((s) => (
