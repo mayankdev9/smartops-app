@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { BadgeCheck, Send, Sparkles, Trash2 } from "lucide-react";
 import Markdown from "@/components/Markdown";
 import AssistantChart, { type ChartSpec } from "@/components/AssistantChart";
+import { useDashboardData } from "@/lib/store";
+import { buildBusinessContext } from "@/lib/analytics";
 
 interface Message {
   role: "user" | "assistant";
@@ -52,6 +54,7 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const dashboard = useDashboardData();
 
   // Restore chat history on first mount.
   useEffect(() => {
@@ -100,7 +103,7 @@ export default function ChatPage() {
       const res = await fetch("/api/assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed, history, businessContext: {} }),
+        body: JSON.stringify({ message: trimmed, history, businessContext: buildBusinessContext(dashboard) }),
       });
       const data = await res.json();
       setMessages((prev) => [
@@ -257,7 +260,7 @@ export default function ChatPage() {
           </button>
         </form>
         <p className="mx-auto mt-1.5 max-w-3xl text-center text-xs text-slate-400">
-          Mock data for prototype — Ahmer&apos;s live pipeline plugs in behind <code>/api/assistant</code>.
+          Answers come from your live pipeline and reflect your uploaded data when connected. Every answer is Critic-validated.
         </p>
       </div>
     </div>

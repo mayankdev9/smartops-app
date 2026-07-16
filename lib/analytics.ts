@@ -94,6 +94,18 @@ function toItems(rows: Record<string, unknown>[], m: Mapping): Item[] {
   return [...byName.values()];
 }
 
+// Map our computed dashboard into the businessContext shape Ahmer's backend
+// reads (kpiCards / skuBreakdown / revenueTrend / currency). When it's the sample
+// (no upload), return {} so the backend answers from its own rich static data.
+export function buildBusinessContext(d: DashboardData): Record<string, unknown> {
+  if (d.isSample) return {};
+  const ctx: Record<string, unknown> = { currency: d.currency };
+  ctx.kpiCards = d.kpiCards.map((c) => ({ metric: c.label, value: c.value, note: c.sub ?? "" }));
+  if (d.topSkus.length) ctx.skuBreakdown = d.topSkus.map((s) => ({ sku: s.sku, units: s.units }));
+  if (d.revenueTrend.length) ctx.revenueTrend = d.revenueTrend;
+  return ctx;
+}
+
 export function computeDashboard(
   rows: Record<string, unknown>[],
   mapping: Mapping,
