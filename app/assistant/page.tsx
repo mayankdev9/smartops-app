@@ -12,16 +12,26 @@ interface Message {
   latencyMs?: number;
 }
 
+// Prompts verified against the live backend (Jul 15) — each returns a strong,
+// real answer and routes to the intended tool. Safe for a live demo.
 const SUGGESTIONS = [
-  "Which SKUs are about to run out?",
-  "What should I order this week?",
-  "What's my most profitable product?",
-  "Where is my capital frozen in slow-movers?",
-  "Forecast Coca-Cola demand for next month",
-  "How's the business doing?",
+  "Which products bring in the most revenue?",
+  "Which states drive the most sales?",
+  "What is my return rate, and which products get returned most?",
+  "How do my sales change by season?",
+  "Give me an overall business summary",
 ];
 
 const TOOL_LABELS: Record<string, string> = {
+  // Ahmer's backend tools
+  sku_tool: "SKU Analysis",
+  revenue_tool: "Revenue",
+  geography_tool: "Geography",
+  returns_tool: "Returns",
+  payment_tool: "Payments",
+  seasonality_tool: "Seasonality",
+  kpi_dashboard_tool: "KPI Dashboard",
+  // local mock tools (fallback when no backend configured)
   stockout: "Stockout Risk",
   slow: "Slow-Mover Analysis",
   abc: "ABC Classification",
