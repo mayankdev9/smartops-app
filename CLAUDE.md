@@ -440,9 +440,11 @@ Still open:
 
 ## Session log
 
+| Jul 16, 2026 | **Multi-tenant prototype** (commit `c706322`): the big "do last" feedback item. Front-end company accounts + users + login + **company-scoped shared data warehouse**. `lib/authStore.ts` (companies/users/session, persisted, demo creds, seeds admin/demo), `components/AuthGate.tsx` (gates app + login/create-company screens), `app/team/page.tsx` (admin user mgmt + shared-data status), Sidebar footer (company/user/role/logout) + admin-only Team nav. `lib/store.ts` refactored: data keyed by companyId so any user's upload is shared across the company. Fixed a `getSnapshot` infinite-loop (useShallow on `useCompanyUsers`). Verified in-browser, clean console. **Prototype only — demo passwords in localStorage, not real auth.** |
+
 **NEW FEEDBACK (from meeting, given Jul 16):**
 1. ✅ **Alerts tab redesign** (commit `eca7f44`) — removed the messages/digest interface; added a full-screen grid of clickable alert categories (Generate PO, Stock-outs, Shipping, etc.), data-driven where the uploaded data supports it. `lib/alerts.ts` + `lib/export.ts:exportPO` + rewritten `app/alerts/page.tsx`.
-2. ⏳ **Company accounts + shared data warehouse (DO LAST):** company sets up an account → admin adds users (IDs/passwords) → a central store so all employees of a company share the same uploaded data (no duplicate uploads). This is real multi-tenant auth + shared storage — big build, explicitly "can be done last."
+2. ✅ **Company accounts + shared data warehouse — DONE Jul 16** (commit `c706322`, front-end prototype). Company setup → admin adds users (IDs/passwords) → login-gated app → data scoped by company so uploads are shared across all its users. Demo login: **admin / demo**. Prototype only (localStorage, demo passwords). Future: real backend + DB for cross-device sharing + real auth.
    - Note: `Group Project/Feedbacks_2.docx` is byte-identical to the original `Feedbacks on SmartOps.docx`; the genuinely new items are these two verbal points.
 
 
