@@ -375,9 +375,10 @@ Match these when adding to the app so it stays consistent:
 ### Feedback audit — essentially complete
 All structural/UX + Alerts + support + onboarding-loop + assistant-uploaded-data items are **done**. Remaining is polish-level: richer per-upload aggregates (geo/channel/returns for uploaded files), true drag-and-drop, QuickBooks import (out of scope), Shopify (skipped). The multi-tenant **company accounts + shared data warehouse is the big "do last"** item.
 
-### ⏸ PAUSED (Jul 16) — resume notes
-- Everything committed, deployed, docs synced. Nothing half-done.
-- **On resume, likely next:** multi-tenant company accounts + shared data (the "do last" item), or richer upload analytics so uploaded-data assistant answers cover geography/channels/returns.
+### ⏸ PAUSED (Jul 16, later) — resume notes
+- Everything committed, deployed, docs synced. Nothing half-done. **Multi-tenant company accounts + shared data DONE** (commit `c706322`) — Mayank will test it.
+- **On resume:** get Mayank's feedback on the multi-tenant flow first; then likely richer per-upload analytics (geo/channels/returns for uploaded files), or productionizing multi-tenant (real backend+DB for cross-device sharing + real auth).
+- **Demo login:** admin / demo. A dev server may be left running on :3000 from this session.
 - Open housekeeping (unchanged): **rotate API keys** (screenshot-exposed), **brief Ahmer** on backend changes, **retire `smartops-app-five`**.
 
 ### How the backend got connected (Jul 15)
