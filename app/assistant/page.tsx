@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BadgeCheck, Send, Sparkles, Trash2 } from "lucide-react";
 import Markdown from "@/components/Markdown";
+import AssistantChart, { type ChartSpec } from "@/components/AssistantChart";
 
 interface Message {
   role: "user" | "assistant";
@@ -10,6 +11,7 @@ interface Message {
   criticValidated?: boolean;
   toolUsed?: string;
   latencyMs?: number;
+  chart?: ChartSpec | null;
 }
 
 // Prompts verified against the live backend (Jul 15) — each returns a strong,
@@ -109,6 +111,7 @@ export default function ChatPage() {
           criticValidated: data.criticValidated,
           toolUsed: data.toolUsed,
           latencyMs: data.latencyMs,
+          chart: data.chart ?? null,
         },
       ]);
     } catch {
@@ -207,6 +210,7 @@ export default function ChatPage() {
                           )}
                         </div>
                         <Markdown text={m.content} />
+                        {m.chart && <AssistantChart chart={m.chart} />}
                       </div>
                     </div>
                   )}
