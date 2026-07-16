@@ -358,22 +358,26 @@ Match these when adding to the app so it stays consistent:
 
 ---
 
-## ▶ STATUS (Jul 15, 2026 — PAUSED, waiting on Ahmer)
+## ▶ STATUS (Jul 15, 2026 — CONSOLIDATED: real backend wired to the new UI)
 
-✅ **Our repo/deploy:** `github.com/mayankdev9/smartops-app` → **https://smartops-agent.vercel.app**
-(MVP + 3 enhancement batches + 2 feedback UI batches). **Backend = still the mock.**
+✅ **ONE canonical version:** `github.com/mayankdev9/smartops-app` → **https://smartops-agent.vercel.app**
+= our **new UI** + **Ahmer's real 5-LLM + Critic backend**. The divergence is resolved.
 
-### ⚠️ KEY SITUATION — two diverged deployments (discovered Jul 15)
-There are **two separate live versions** of SmartOps:
-| | `smartops-app-five.vercel.app` (Ahmer's) | `smartops-agent.vercel.app` (ours) |
-|---|---|---|
-| Front-end | **OLD** (Assistant is landing, `/assistant` = 404) + his own tweaks (sidebar shows the data file) | **NEW** (Dashboard landing, chat at `/assistant`, interactive, business-health) |
-| Backend | **Ahmer's REAL 5-LLM + Critic pipeline** ✅ (honors our contract — badge/tool/latency all work) | our mock |
+### How the backend got connected (Jul 15)
+Ahmer decoupled his pipeline into a standalone **FastAPI** repo (`github.com/ahmer64-sketch/smartops-backend`, `POST /assistant`) that matches our contract exactly. Steps taken:
+1. **Forked** it → `github.com/mayankdev9/smartops-backend`.
+2. **Deployed on Render** as a Web Service — **live at `https://smartops-backend-mwof.onrender.com`**.
+   - Runtime Python 3, build `pip install -r requirements.txt`, start `uvicorn server:app --host 0.0.0.0 --port $PORT`.
+   - Env vars: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` (both required or it won't boot).
+   - **Instance: Standard (2 GB RAM)** — the 512 MB Starter tier OOM'd loading the 30 MB `Customer Data.xlsx`; 2 GB fixed it.
+3. **Our `/api/assistant`** now proxies to it via **`ASSISTANT_BACKEND_URL=https://smartops-backend-mwof.onrender.com/assistant`** (set in Vercel, Production+Preview). Redeployed.
+   - Verified directly: backend `/health` = ok; a real query → `toolUsed: sku_tool`, `criticValidated: true`, ~8.5 s, real answer (WTPSET10BKNYGRS, 210 units, ₹153,647.29).
 
-**How we know:** his live answers reference real SKU codes / ₹ revenue / Summary·Risks·Actions·Confidence at ~9s latency (not our canned mock); `smartops-app-five/assistant` = 404 (older FE). Our feedback UI changes touch **8 files, none of them `app/api/assistant` or `lib/mock`** — so his backend change and our UI changes are conflict-free by design (the seam worked).
-
-### The plan (sent to Ahmer via WhatsApp, Jul 15 — awaiting reply)
-Consolidate onto **one repo**. Preferred: Ahmer shares his `/api/assistant` change (file + backend URL/env vars); Mayank folds it into this repo → `smartops-agent` becomes canonical (new UI + real backend); retire `smartops-app-five`. Alternative: Ahmer owns UI on this repo via branches. **Decision pending Ahmer's answer** on (1) which files he changed, (2) backend URL/env vars, (3) where `smartops-app-five` source lives.
+### ⚠️ TODO / follow-ups
+- **ROTATE THE API KEYS** — both keys were shown in a screenshot during setup. Regenerate Anthropic (console.anthropic.com) + OpenAI (platform.openai.com), update the two values in Render.
+- **Retire `smartops-app-five.vercel.app`** (Ahmer's old separate deploy) — everyone uses `smartops-agent` now.
+- Render **Standard is ~$25/mo**; if optimizing later, convert the 30 MB Excel to parquet/csv so it fits a smaller instance.
+- **Resume feedback batches 3–4** (Alerts redesign + Generate PO; reposition assistant copy + Help/FAQ) now that consolidation is done.
 
 ### Feedback UI work done so far (Jul 15) — all pure UI, seam untouched
 - ✅ **Batch 1** (`7c0981f`): default landing = **Dashboard** (`/`→`/dashboard`); chat moved to `/assistant`; sidebar reordered to customer-journey flow.
@@ -423,6 +427,7 @@ Still open:
 | Jul 15, 2026 | **Feedback pass** started (commit `7c0981f`): default landing = **Dashboard** (`/` → `/dashboard`); Chat moved to **`/assistant`** (end of flow); sidebar reordered to the customer-journey sequence. Per class/prof feedback (`Group Project/Feedbacks on SmartOps.docx`). API seam untouched. **Note:** Ahmer's backend connection is not in this repo — verified our repo + live deploy are still the mock. |
 | Jul 15, 2026 | **Feedback batch 2** (commit `f6efe5c`): Business Health hero + clickable SKUs → `components/SkuDrawer.tsx` detail panel; `businessHealth()` in analytics. |
 | Jul 15, 2026 | **Divergence discovered:** Ahmer's real backend is live at **`smartops-app-five.vercel.app`** (separate deploy, OLD front-end). Ours (`smartops-agent`) has the new UI + mock. Sent WhatsApp asking Ahmer for his `/api/assistant` change + backend URL to consolidate onto one repo. **Paused batches 3–4** until he replies. Tagged `feedback-ui-v1`. Synced both CLAUDE.md files. |
+| Jul 15, 2026 | **CONSOLIDATED ✅** Ahmer gave us his backend as a standalone FastAPI repo. Wired `/api/assistant` to proxy to `ASSISTANT_BACKEND_URL` (commit `e788b71`). Forked `smartops-backend` → deployed on **Render** (2 GB Standard) at `smartops-backend-mwof.onrender.com`. Set the env var in Vercel + redeployed. **Verified live end-to-end:** `smartops-agent.vercel.app` now returns real answers (`sku_tool`, ~5s, WTPSET10BKNYGRS). One canonical version = new UI + real backend. TODO: rotate API keys (screenshot-exposed), retire `smartops-app-five`, resume batches 3–4. |
 | Jul 11, 2026 | **Enhancement Batch 3** (commits `0d8b3c3`, `e294315`): uploaded file now **drives the Dashboard** — new `lib/mapping.ts` (auto-detect columns), `lib/analytics.ts` (`computeDashboard`), `lib/store.ts` (zustand, persisted); Onboarding column-mapping UI + currency; Dashboard renders sample-or-uploaded via `useDashboardData()` with banner/reset/empty-states. Plus **Excel + PDF export** (`lib/export.ts`, +`jspdf`/`jspdf-autotable`). Verified: analytics + export via Node, typecheck, build, live. |
 
 ---
