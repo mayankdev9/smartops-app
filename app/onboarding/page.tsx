@@ -8,6 +8,7 @@ import { parseUpload, type ParsedUpload } from "@/lib/parseUpload";
 import { autoDetectMapping, FIELDS, isMappingValid, type Mapping } from "@/lib/mapping";
 import { businessHealth, computeDashboard } from "@/lib/analytics";
 import { useDashboardData, useDataStore } from "@/lib/store";
+import { useCurrentCompany, useCurrentUser } from "@/lib/authStore";
 
 const STEPS = ["Business", "Connect data", "Diagnosis"];
 const CURRENCIES = ["₹", "$", "€", "£"];
@@ -28,6 +29,8 @@ const HEALTH_STYLES = {
 export default function OnboardingPage() {
   const router = useRouter();
   const setData = useDataStore((s) => s.setData);
+  const currentCompany = useCurrentCompany();
+  const currentUser = useCurrentUser();
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [type, setType] = useState(business.type);
@@ -67,7 +70,9 @@ export default function OnboardingPage() {
   // Compute the dashboard from the uploaded rows + mapping and store it.
   function finish() {
     if (parsed && isMappingValid(mapping)) {
-      setData(computeDashboard(parsed.rows, mapping, currency, parsed.fileName));
+      if (currentCompany) {
+        setData(currentCompany.id, computeDashboard(parsed.rows, mapping, currency, parsed.fileName), currentUser?.name ?? "a teammate");
+      }
     }
     setStep(2);
   }

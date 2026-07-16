@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BadgeCheck, Bell, HelpCircle, LayoutDashboard, Menu, MessageSquare, Settings, X, Zap } from "lucide-react";
-import { business } from "@/lib/data";
+import { BadgeCheck, Bell, HelpCircle, LayoutDashboard, LogOut, Menu, MessageSquare, Settings, Users, X, Zap } from "lucide-react";
+import { useAuthStore, useCurrentCompany, useCurrentUser } from "@/lib/authStore";
 
 // Customer-journey order (per professor feedback): start on the Dashboard for
 // overall business status, drill into details, and reach the Assistant last.
@@ -32,9 +32,11 @@ function Brand() {
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const user = useCurrentUser();
+  const items = user?.role === "admin" ? [...NAV, { href: "/team", label: "Team", icon: Users }] : NAV;
   return (
     <nav className="flex-1 space-y-1 px-3 py-4">
-      {NAV.map(({ href, label, icon: Icon }) => {
+      {items.map(({ href, label, icon: Icon }) => {
         const active = pathname === href;
         return (
           <Link
@@ -55,16 +57,28 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 function Footer() {
+  const company = useCurrentCompany();
+  const user = useCurrentUser();
+  const logout = useAuthStore((s) => s.logout);
   return (
     <div className="border-t border-slate-100 px-4 py-4">
       <div className="mb-3 flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
         <BadgeCheck size={14} />
         Critic-validated answers
       </div>
-      <div className="px-1">
-        <p className="text-sm font-semibold text-slate-800">{business.name}</p>
-        <p className="text-xs text-slate-500">{business.type}</p>
+      <div className="mb-2 px-1">
+        <p className="text-sm font-semibold text-slate-800">{company?.name ?? "SmartOps"}</p>
+        <p className="text-xs text-slate-500">
+          {user?.name}
+          {user?.role === "admin" ? " · Admin" : ""}
+        </p>
       </div>
+      <button
+        onClick={logout}
+        className="flex w-full items-center gap-2 rounded-lg px-1 py-1.5 text-xs font-medium text-slate-500 transition hover:text-slate-800"
+      >
+        <LogOut size={14} /> Log out
+      </button>
     </div>
   );
 }

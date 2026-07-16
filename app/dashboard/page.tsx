@@ -19,6 +19,7 @@ import { Activity, AlertTriangle, ArrowRight, ChevronRight, Database, FileSpread
 import type { Insight } from "@/lib/data";
 import { businessHealth, type KpiCard as KpiCardData } from "@/lib/analytics";
 import { useDashboardData, useDataStore } from "@/lib/store";
+import { useCurrentCompany } from "@/lib/authStore";
 import { exportExcel, exportPdf } from "@/lib/export";
 import SkuDrawer, { type SkuDetail } from "@/components/SkuDrawer";
 
@@ -84,7 +85,9 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 
 export default function DashboardPage() {
   const d = useDashboardData();
-  const clear = useDataStore((s) => s.clear);
+  const clearData = useDataStore((s) => s.clear);
+  const company = useCurrentCompany();
+  const clear = () => company && clearData(company.id);
   const [selectedSku, setSelectedSku] = useState<SkuDetail | null>(null);
   const health = businessHealth(d);
   const hs = HEALTH_STYLES[health.tone];

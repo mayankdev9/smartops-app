@@ -4,27 +4,51 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { DashboardData } from "./analytics";
 import { sampleDashboard } from "./data";
+import { useAuthStore } from "./authStore";
+
+// Data is scoped BY COMPANY — this is the "shared data warehouse": whichever user
+// in a company uploads a file, every user in that company sees it. Keyed by
+// companyId so different companies never see each other's data.
+
+export interface CompanyRecord {
+  data: DashboardData;
+  uploadedBy: string; // user's display name
+  uploadedAt: number; // epoch ms
+}
 
 interface DataState {
-  // The computed dashboard from an uploaded file, or null to use sample data.
-  data: DashboardData | null;
-  setData: (d: DashboardData) => void;
-  clear: () => void;
+  records: Record<string, CompanyRecord>;
+  setData: (companyId: string, data: DashboardData, uploadedBy: string) => void;
+  clear: (companyId: string) => void;
 }
 
 export const useDataStore = create<DataState>()(
   persist(
     (set) => ({
-      data: null,
-      setData: (data) => set({ data }),
-      clear: () => set({ data: null }),
+      records: {},
+      setData: (companyId, data, uploadedBy) =>
+        set((s) => ({ records: { ...s.records, [companyId]: { data, uploadedBy, uploadedAt: Date.now() } } })),
+      clear: (companyId) =>
+        set((s) => {
+          const next = { ...s.records };
+          delete next[companyId];
+          return { records: next };
+        }),
     }),
     { name: "smartops-data" },
   ),
 );
 
-/** Returns the uploaded dataset's dashboard if present, else the built-in sample. */
+/** The current company's uploaded dashboard, or the built-in sample if none. */
 export function useDashboardData(): DashboardData {
-  const data = useDataStore((s) => s.data);
-  return data ?? sampleDashboard;
+  const companyId = useAuthStore((s) => s.session?.companyId);
+  const rec = useDataStore((s) => (companyId ? s.records[companyId] : undefined));
+  return rec?.data ?? sampleDashboard;
+}
+
+/** Metadata about the current company's uploaded data (who/when), or null. */
+export function useCompanyDataMeta(): { uploadedBy: string; uploadedAt: number } | null {
+  const companyId = useAuthStore((s) => s.session?.companyId);
+  const rec = useDataStore((s) => (companyId ? s.records[companyId] : undefined));
+  return rec ? { uploadedBy: rec.uploadedBy, uploadedAt: rec.uploadedAt } : null;
 }
