@@ -446,7 +446,8 @@ Ahmer decoupled his pipeline into a standalone **FastAPI** repo (`github.com/ahm
 ## Next steps (enhancements)
 
 ### 📋 To-do / update ideas (Mayank, Jul 16)
-1. ✅ **Don't re-ask for company details on import** (done — commit pending). Onboarding Step 0 no longer asks for company name/type/SKU; it shows a read-only **company summary card** (name · type · admin, "Signed in") pulled from `useCurrentCompany()` + keeps the optional "biggest headache" question. Removed the unused `name`/`type`/`skus` state, the `business` import, and the `Field` component; Step 2 greeting now uses `currentCompany.name`. (`app/onboarding/page.tsx`)
+1. ✅ **Don't re-ask for company details on import** (commit `f4b5d66`, live). Onboarding Step 0 no longer asks for company name/type/SKU; it shows a read-only **company summary card** (name · type · admin, "Signed in") from `useCurrentCompany()` + keeps the optional "biggest headache" question. Removed unused `name`/`type`/`skus` state, the `business` import, and the `Field` component; Step 2 greeting uses `currentCompany.name`. (`app/onboarding/page.tsx`)
+2. ✅ **"Page unresponsive" on big-file upload** (commit `62883e6`, live). Parsing + aggregating the 30MB / ~600k-row file ran synchronously on the main thread and froze the tab. Moved it into a **Web Worker** (`lib/upload.worker.ts` + `lib/uploadSession.ts`; `parseArrayBuffer()` extracted from `parseUpload.ts`) so the UI stays responsive; onboarding shows an "Analyzing your data…" state. Synchronous fallback if a worker can't start, so upload never breaks. Verified end-to-end on localhost (parse + compute both in the worker, no errors). **Not verifiable with the real 30MB file via tooling — Mayank/teammates should confirm the freeze is gone.**
 
 Done in the Jul 11 enhancement pass (Batch 1):
 - [x] Deploy to Vercel — live at https://smartops-agent.vercel.app
