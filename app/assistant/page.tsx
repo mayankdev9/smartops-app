@@ -5,7 +5,7 @@ import { BadgeCheck, Send, Sparkles, Trash2 } from "lucide-react";
 import Markdown from "@/components/Markdown";
 import AssistantChart, { type ChartSpec } from "@/components/AssistantChart";
 import { useDashboardData } from "@/lib/store";
-import { buildBusinessContext } from "@/lib/analytics";
+import { buildBusinessContext, type DashboardData } from "@/lib/analytics";
 
 interface Message {
   role: "user" | "assistant";
@@ -47,6 +47,31 @@ const TOOL_LABELS: Record<string, string> = {
 };
 
 const STORAGE_KEY = "smartops-chat";
+
+// The backend charts its static-data answers, but the uploaded-data path
+// (toolUsed=uploaded_business_context) returns chart:null. When we're on uploaded
+// data and the question maps to something the Dashboard already computed, draw a
+// chart from that so answers about your own data still get a graph. Topics the
+// upload doesn't compute (geography/returns/payments/channels) get no chart.
+function fallbackChart(question: string, d: DashboardData): ChartSpec | null {
+  if (d.isSample) return null;
+  const q = question.toLowerCase();
+  if (/(state|region|city|geograph|return|refund|payment|prepaid|\bcod\b|channel)/.test(q)) return null;
+
+  const wantsSku = /(product|sku|item|top.?sell|best.?sell|top.?product)/.test(q);
+  const wantsTrend = /(revenue|sales|trend|month|season|growth|grew|declin|overall|summary|health|performance)/.test(q);
+  if (!wantsSku && !wantsTrend) return null;
+
+  const skuChart = (): ChartSpec | null =>
+    d.topSkus.length ? { type: "bar", title: "Top SKUs by units", data: d.topSkus.map((s) => ({ name: s.sku, value: s.units })) } : null;
+  const trendChart = (): ChartSpec | null =>
+    d.revenueTrend.length >= 2
+      ? { type: "line", title: "Revenue trend", data: d.revenueTrend.map((t) => ({ name: t.day, value: t.revenue })) }
+      : null;
+
+  if (wantsSku) return skuChart() ?? trendChart();
+  return trendChart() ?? skuChart();
+}
 
 export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -114,7 +139,7 @@ export default function ChatPage() {
           criticValidated: data.criticValidated,
           toolUsed: data.toolUsed,
           latencyMs: data.latencyMs,
-          chart: data.chart ?? null,
+          chart: data.chart ?? fallbackChart(trimmed, dashboard),
         },
       ]);
     } catch {
