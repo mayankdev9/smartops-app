@@ -23,7 +23,9 @@ export class UploadSession {
   async parse(file: File): Promise<ParsedMeta> {
     const buffer = await file.arrayBuffer();
     try {
-      const worker = new Worker(new URL("./upload.worker.ts", import.meta.url));
+      // Pre-bundled classic worker in /public (see scripts/build-worker.mjs).
+      // Loaded from the site origin so it runs off the main thread in production.
+      const worker = new Worker("/upload-worker.js");
       this.worker = worker;
       // Copy the buffer for the worker; keep the original for a fallback retry.
       return await this.roundtrip<ParsedMeta>(worker, { type: "parse", buffer: buffer.slice(0) }, "parsed");

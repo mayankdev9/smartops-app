@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "build:worker": "node scripts/build-worker.mjs",
+    "predev": "node scripts/build-worker.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/build-worker.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
@@ -27,6 +30,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "autoprefixer": "^10.5.0",
+    "esbuild": "^0.28.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "postcss": "^8.5.15",
