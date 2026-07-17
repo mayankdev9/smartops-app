@@ -60,22 +60,22 @@ export const abcBreakdown = [
   { name: "Class C", skus: 14, revenuePct: 8, color: "#cbd5e1" },
 ];
 
-// Revenue trend — last 14 days (₹ thousands)
+// Revenue trend — last 14 days (raw ₹, so the chart's compact axis matches uploads)
 export const revenueTrend = [
-  { day: "Jun 28", revenue: 24 },
-  { day: "Jun 29", revenue: 27 },
-  { day: "Jun 30", revenue: 22 },
-  { day: "Jul 1", revenue: 31 },
-  { day: "Jul 2", revenue: 29 },
-  { day: "Jul 3", revenue: 34 },
-  { day: "Jul 4", revenue: 38 },
-  { day: "Jul 5", revenue: 26 },
-  { day: "Jul 6", revenue: 28 },
-  { day: "Jul 7", revenue: 33 },
-  { day: "Jul 8", revenue: 35 },
-  { day: "Jul 9", revenue: 32 },
-  { day: "Jul 10", revenue: 37 },
-  { day: "Jul 11", revenue: 40 },
+  { day: "Jun 28", revenue: 24000 },
+  { day: "Jun 29", revenue: 27000 },
+  { day: "Jun 30", revenue: 22000 },
+  { day: "Jul 1", revenue: 31000 },
+  { day: "Jul 2", revenue: 29000 },
+  { day: "Jul 3", revenue: 34000 },
+  { day: "Jul 4", revenue: 38000 },
+  { day: "Jul 5", revenue: 26000 },
+  { day: "Jul 6", revenue: 28000 },
+  { day: "Jul 7", revenue: 33000 },
+  { day: "Jul 8", revenue: 35000 },
+  { day: "Jul 9", revenue: 32000 },
+  { day: "Jul 10", revenue: 37000 },
+  { day: "Jul 11", revenue: 40000 },
 ];
 
 // Top SKUs by units — last 30 days
@@ -140,6 +140,7 @@ export const sampleDashboard: DashboardData = {
   source: "Sample data",
   isSample: true,
   currency: "₹",
+  hasInventory: true,
   kpiCards: [
     { icon: "revenue", label: "Revenue (30d)", value: kpis.revenue30d, sub: `↑ ${kpis.revenueDeltaPct}% vs prior 30d`, tone: "up" },
     { icon: "units", label: "Units Sold", value: kpis.unitsSold.toLocaleString(), sub: `across ${abcBreakdown.reduce((n, c) => n + c.skus, 0)} SKUs` },

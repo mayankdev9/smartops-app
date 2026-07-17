@@ -42,6 +42,21 @@ const KPI_ICONS: Record<KpiCardData["icon"], React.ReactNode> = {
   risk: <AlertTriangle size={16} />,
 };
 
+// Compact currency for chart axes/tooltips (₹1,27,00,000 → ₹1.3Cr, $1.2M).
+function compact(currency: string, n: number): string {
+  const abs = Math.abs(n);
+  if (currency === "₹") {
+    if (abs >= 1e7) return `${currency}${(n / 1e7).toFixed(abs >= 1e8 ? 0 : 1)}Cr`;
+    if (abs >= 1e5) return `${currency}${(n / 1e5).toFixed(abs >= 1e6 ? 0 : 1)}L`;
+    if (abs >= 1e3) return `${currency}${Math.round(n / 1e3)}K`;
+    return `${currency}${Math.round(n)}`;
+  }
+  if (abs >= 1e9) return `${currency}${(n / 1e9).toFixed(1)}B`;
+  if (abs >= 1e6) return `${currency}${(n / 1e6).toFixed(1)}M`;
+  if (abs >= 1e3) return `${currency}${Math.round(n / 1e3)}K`;
+  return `${currency}${Math.round(n)}`;
+}
+
 function InsightCard({ insight }: { insight: Insight }) {
   const s = INSIGHT_STYLES[insight.tone];
   return (
@@ -199,21 +214,27 @@ export default function DashboardPage() {
         {/* Charts row */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <Card title={`Revenue trend (${d.currency} thousands / day)`}>
+            <Card title="Revenue trend">
               {d.revenueTrend.length > 0 ? (
                 <ResponsiveContainer width="100%" height={220}>
-                  <AreaChart data={d.revenueTrend} margin={{ left: -20, right: 8, top: 4 }}>
+                  <AreaChart data={d.revenueTrend} margin={{ left: -8, right: 8, top: 4 }}>
                     <defs>
                       <linearGradient id="rev" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#1d4ed8" stopOpacity={0.25} />
                         <stop offset="100%" stopColor="#1d4ed8" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <XAxis dataKey="day" tick={{ fontSize: 11, fill: "#94a3b8" }} interval={2} tickLine={false} axisLine={false} />
-                    <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
+                    <XAxis dataKey="day" tick={{ fontSize: 11, fill: "#94a3b8" }} interval="preserveStartEnd" tickLine={false} axisLine={false} />
+                    <YAxis
+                      tick={{ fontSize: 11, fill: "#94a3b8" }}
+                      tickLine={false}
+                      axisLine={false}
+                      width={52}
+                      tickFormatter={(v) => compact(d.currency, Number(v))}
+                    />
                     <Tooltip
                       contentStyle={{ borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 12 }}
-                      formatter={(v) => [`${d.currency}${v}k`, "Revenue"]}
+                      formatter={(v) => [compact(d.currency, Number(v)), "Revenue"]}
                     />
                     <Area type="monotone" dataKey="revenue" stroke="#1d4ed8" strokeWidth={2} fill="url(#rev)" />
                   </AreaChart>
@@ -252,9 +273,9 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Top SKUs + risk lists */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="lg:col-span-2">
+        {/* Top SKUs + risk lists (reorder list only when the file carries stock) */}
+        <div className={`grid grid-cols-1 gap-4 ${d.hasInventory ? "lg:grid-cols-3" : ""}`}>
+          <div className={d.hasInventory ? "lg:col-span-2" : ""}>
             <Card title="Top SKUs by units">
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={d.topSkus} layout="vertical" margin={{ left: 40, right: 16 }}>
@@ -271,6 +292,7 @@ export default function DashboardPage() {
             </Card>
           </div>
 
+          {d.hasInventory && (
           <Card title="Reorder now">
             {d.stockoutRisks.length > 0 ? (
               <ul className="space-y-1">
@@ -307,9 +329,11 @@ export default function DashboardPage() {
               <p className="py-6 text-center text-sm text-slate-400">No stockout risks detected.</p>
             )}
           </Card>
+          )}
         </div>
 
-        {/* Slow-movers */}
+        {/* Slow-movers (inventory files only) */}
+        {d.hasInventory && (
         <Card title="Capital tied up — slow-movers">
           {d.slowMovers.length > 0 ? (
             <div className="overflow-x-auto">
@@ -354,6 +378,7 @@ export default function DashboardPage() {
             <p className="py-6 text-center text-sm text-slate-400">No slow-movers detected.</p>
           )}
         </Card>
+        )}
       </div>
 
       <SkuDrawer sku={selectedSku} onClose={() => setSelectedSku(null)} />

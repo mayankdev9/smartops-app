@@ -15,7 +15,7 @@ const MAX_PREVIEW_ROWS = 5;
 
 export async function parseUpload(file: File): Promise<ParsedUpload> {
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: "array" });
+  const wb = XLSX.read(buf, { type: "array", cellDates: true });
 
   const firstSheet = wb.SheetNames[0];
   if (!firstSheet) throw new Error("The file has no sheets.");

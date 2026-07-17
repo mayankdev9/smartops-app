@@ -1,26 +1,33 @@
 // Column mapping for uploaded spreadsheets.
-// The app needs to know which uploaded column is the product, units sold, etc.
+// The app needs to know which uploaded column is the product, units, amount, etc.
 // We auto-guess from column names; the user can override in the Onboarding UI.
+// Handles both inventory files (units/stock/price) and sales files (amount/date).
 
-export type FieldKey = "product" | "unitsSold" | "onHand" | "price" | "cost";
+export type FieldKey = "product" | "unitsSold" | "amount" | "date" | "onHand" | "price" | "cost";
 
 export type Mapping = Partial<Record<FieldKey, string>>;
 
+// Order matters for auto-detect (each column is claimed once, top to bottom).
 export const FIELDS: { key: FieldKey; label: string; required: boolean; hint: string }[] = [
   { key: "product", label: "Product / SKU", required: true, hint: "The item name or code" },
-  { key: "unitsSold", label: "Units sold", required: true, hint: "Quantity sold in the period" },
+  { key: "unitsSold", label: "Units / quantity", required: true, hint: "Quantity per row" },
+  { key: "amount", label: "Sales / revenue amount", required: false, hint: "Revenue per row — powers Revenue & AOV" },
+  { key: "date", label: "Order date", required: false, hint: "Powers the revenue trend over time" },
   { key: "onHand", label: "Units on hand", required: false, hint: "Current stock — powers stockout risk" },
-  { key: "price", label: "Selling price", required: false, hint: "Per-unit price — powers revenue" },
+  { key: "price", label: "Selling price", required: false, hint: "Per-unit price (used if there's no amount column)" },
   { key: "cost", label: "Unit cost", required: false, hint: "Per-unit cost — powers margins" },
 ];
 
-// Keyword patterns per field. Order of FIELDS matters: each column is claimed once.
+// Keyword patterns per field. amount is separate from unitsSold so a "Sales"
+// column (revenue) isn't mistaken for a quantity.
 const KEYWORDS: Record<FieldKey, RegExp> = {
-  product: /\b(sku|product|item|name|description|article)\b/i,
-  unitsSold: /(sold|qty|quantity|units|sales|volume|movement)/i,
-  onHand: /(on.?hand|in.?stock|stock|inventory|qoh|available|balance|closing)/i,
-  price: /(price|mrp|rate|selling|revenue|amount)/i,
-  cost: /(cost|purchase|buy|landed|cogs)/i,
+  product: /\b(sku|product|item|article)\b|product.?name|item.?name/i,
+  unitsSold: /(sold|qty|quantity|units|volume|movement|pieces|pcs)\b/i,
+  amount: /(sales|revenue|gmv|turnover|net.?sales|amount)\b/i,
+  date: /\bdate\b|order.?date|invoice.?date|\b(month|day|period|timestamp|created)\b/i,
+  onHand: /(on.?hand|in.?stock|\bstock\b|inventory|qoh|available|balance|closing)/i,
+  price: /\b(price|mrp|rate|selling|unit.?price)\b/i,
+  cost: /\b(cost|purchase|buy|landed|cogs)\b/i,
 };
 
 /** Best-effort auto-detection: assign each field the first matching, unclaimed column. */

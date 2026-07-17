@@ -92,9 +92,10 @@ smartops-app/
 │   ├── mock.ts                 ← Mock engine: routes query→tool, canned answers,
 │   │                             fakes Critic pass (~93%) + latency
 │   ├── data.ts                 ← Sample business data + `insights` + `sampleDashboard`
-│   ├── parseUpload.ts          ← Client-side .csv/.xlsx parser (SheetJS)
-│   ├── mapping.ts              ← Auto-detect + validate column→field mapping
-│   ├── analytics.ts            ← computeDashboard(rows, mapping) → real KPIs/ABC/…
+│   ├── parseUpload.ts          ← Client-side .csv/.xlsx parser (SheetJS, cellDates)
+│   ├── mapping.ts              ← Auto-detect col→field: product/units/amount/date/stock/price/cost
+│   ├── analytics.ts            ← computeDashboard(rows, mapping) → KPIs/ABC/trend/… (inventory OR sales files; hasInventory flag)
+│   ├── smalltalk.ts            ← getSmallTalk(): instant replies for greetings/thanks/help (skips the pipeline)
 │   ├── store.ts                ← zustand (persisted): holds computed dashboard
 │   └── export.ts               ← Excel (SheetJS) + PDF (jsPDF) report export
 ├── .env.local.example          ← Env var docs (none needed for mock)
@@ -160,10 +161,10 @@ markdown answer:
 
 ```
 Onboarding upload (.csv/.xlsx)
-  → parseUpload()            rows + columns                     (lib/parseUpload.ts)
-  → autoDetectMapping()      guess product/units/stock/price    (lib/mapping.ts)
+  → parseUpload()            rows + columns (cellDates:true)     (lib/parseUpload.ts)
+  → autoDetectMapping()      product/units/amount/date/stock/... (lib/mapping.ts)
   → [user confirms mapping + currency in the UI]
-  → computeDashboard()       real KPIs/ABC/stockout/slow/insights (lib/analytics.ts)
+  → computeDashboard()       real KPIs/ABC/trend/stockout/insights (lib/analytics.ts)
   → useDataStore.setData()   persisted in localStorage           (lib/store.ts)
   → Dashboard reads useDashboardData() → uploaded data or sampleDashboard
   → export.ts                Excel/PDF of whatever is showing     (lib/export.ts)
@@ -172,15 +173,30 @@ Onboarding upload (.csv/.xlsx)
 Key points:
 - **One render path.** `sampleDashboard` (in `lib/data.ts`) and `computeDashboard`
   output the same `DashboardData` shape, so the Dashboard doesn't branch on source.
+- **Two file shapes, one path (added Jul 16).** Handles both an **inventory
+  snapshot** (row per SKU: on-hand + price) and a **sales / transaction log** (row
+  per order line: a `Sales` amount + a `Date` — e.g. the multi-channel
+  `Customer Data.xlsx`, 588k rows). `computeDashboard` totals over **every row**
+  (not just rows carrying a SKU code — that old `toItems` filter was why a sales
+  file only counted ~4.7k of 589k units), reads revenue from the **amount** column
+  (fallback price×units), and builds a **monthly revenue trend** from the **date**
+  column. A `hasInventory` flag (= file has a stock column) drives the UI:
+    - inventory → KPI cards Revenue / Units / **Capital in Stock / Stockout Risk**;
+      Reorder + Slow-mover panels shown.
+    - sales (no stock) → KPI cards Revenue / Units / **Orders / Avg Order Value**;
+      Reorder + Slow-mover panels **hidden**; business-health judged by the trend.
+  Verified on the real file: Revenue ₹64.08 Cr, 589,398 units, 588,228 orders,
+  12-month trend Apr 2025→Mar 2026.
 - **Small persistence.** The store keeps the *computed* `DashboardData` (aggregates
   + top-N lists), not raw rows — safe for localStorage, survives refresh.
 - **Robust to any schema.** Auto-mapping guesses columns by name; the user can
-  correct via dropdowns. Required fields: Product + Units sold. Missing optional
-  fields (stock/price/cost) degrade gracefully (cards show "—" with a hint).
-- **Currency-aware.** Chosen in onboarding (₹/$/€/£), threaded through analytics + UI.
-- **Known limit:** the **Assistant** mock still answers from sample data (it's
-  server-side; wiring uploaded metrics into `businessContext` is a listed next step).
-  Only the **Dashboard** currently reflects the upload.
+  correct via dropdowns (the mapping UI lists all 7 fields incl. **Sales amount**
+  + **Order date**). Required fields: Product + Units. Missing optional fields
+  degrade gracefully (cards show "—" with a hint; no date → trend shows a hint).
+- **Currency-aware + compact.** Currency chosen in onboarding (₹/$/€/£); chart axes
+  use a compact formatter (`compact()` in dashboard: ₹→L/Cr, else K/M/B).
+- **Assistant reflects the upload** via `buildBusinessContext()` → `businessContext`
+  (kpiCards/skuBreakdown/revenueTrend/currency); sample sends `{}`.
 
 ---
 
@@ -358,10 +374,16 @@ Match these when adding to the app so it stays consistent:
 
 ---
 
-## ▶ STATUS (Jul 16, 2026 — feedback round 2 shipped; PAUSED)
+## ▶ STATUS (Jul 16, 2026 — sales-data dashboard fix; feedback round 2 shipped)
 
 ✅ **ONE canonical version:** `github.com/mayankdev9/smartops-app` → **https://smartops-agent.vercel.app**
 = our **new UI** + **Ahmer's real 5-LLM + Critic backend**. Backend fork: `github.com/mayankdev9/smartops-backend` → Render `smartops-backend-mwof.onrender.com`.
+
+### Chat small-talk fix (Jul 16, latest — built + verified, not yet committed/pushed)
+"Hi" (and other greetings) got **no response** — every message, including small talk, was sent through Ahmer's 5-LLM + Critic pipeline, which is built for operational questions and returns empty/slow on a greeting. Added `lib/smalltalk.ts` (`getSmallTalk()`) + a fast-path in `app/api/assistant/route.ts` **before** both the proxy and the mock: greetings, thanks, good-byes, and "what can you do / who are you / help" get an instant, on-brand reply (`toolUsed:"general"`, no Critic badge). Guarded so it only fires on short gestures (≤6 words) or explicit capability phrasings — real questions that merely start with a matched word still reach the pipeline. Verified in-browser: "Hi" → instant greeting (0.0s), real questions unaffected. **⏳ Still to do: git commit + push.**
+
+### Sales-data dashboard fix (Jul 16, latest — built + verified, not yet committed/pushed)
+Uploading the multi-channel **sales log** (`Customer Data.xlsx`) used to break the Dashboard: Revenue "—", only 4,692 of 589k units, empty trend, misleading "healthy inventory". Root cause: analytics assumed an inventory snapshot (revenue = units×price, totals only over rows with a SKU code, no date parsing). **Fixed** so one code path handles inventory OR sales files — see "How uploaded data drives the app". Touched: `lib/parseUpload.ts` (cellDates), `lib/mapping.ts` (+amount/+date fields; "sales" removed from the units keyword so a revenue column isn't read as quantity), `lib/analytics.ts` (all-row totals, amount-based revenue, monthly trend, adaptive KPI cards, `hasInventory` flag, trend-based business health), `lib/data.ts` (sample `hasInventory:true`, revenueTrend rescaled to raw ₹), `app/dashboard/page.tsx` (compact-currency chart axis, generic "Revenue trend" title, hide Reorder+Slow-movers when `!hasInventory`). Verified: `tsc` clean, `npm run build` green, node run vs the real 588k-row file (Revenue ₹64.08 Cr, 589,398 units, 588,228 orders, AOV ₹1,089, 12-month trend), sample inventory dashboard unchanged in-browser (no console errors). **⏳ Still to do: git commit + push (auto-deploys to Vercel).**
 
 ### Shipped Jul 16 (this session) — all live
 - **Alerts redesign** (`eca7f44`): removed the digest/messages UI → full-screen grid of 8 clickable alert-category tiles (Generate PO, Stock-outs, Slow-movers, Fast-movers, Shipping, Returns, Payments, Margins), priority color-coding, real **Generate PO** PDF. Data-driven tiles derive from the live dashboard data.
@@ -433,7 +455,7 @@ Done in Batch 3 (Jul 11):
 Still open:
 - [ ] Wire Ahmer's real 5-LLM pipeline behind `/api/assistant` (pick option 1 or 2) — **deferred by Mayank; do later**
 - [x] **Assistant answers now reflect uploaded data** (commit `5447477`) — FE sends `businessContext` (the backend already supported it). Note: our upload only computes generic aggregates (KPIs, top SKUs, revenue trend), so geography/channel/returns questions on uploaded data are limited; richer per-upload aggregates would be a future analytics enhancement.
-- [ ] Revenue-trend chart for uploads needs a date column (currently shows a hint) — parse dates + aggregate by day
+- [x] **Revenue-trend chart for uploads** (Jul 16) — `parseUpload` reads dates (`cellDates`), `computeDashboard` aggregates by month from the mapped **date** column; shows a hint only when no date column exists
 - [ ] Actually *send* the daily alert (needs email/WhatsApp API + scheduler) — needs external setup
 - [ ] Auth / multi-tenant — overkill for the class demo; parked
 
@@ -441,6 +463,8 @@ Still open:
 
 ## Session log
 
+| Jul 16, 2026 | **Chat small-talk fix** (built + verified, pending commit): "Hi" got no response because greetings were sent through the operational pipeline. Added `lib/smalltalk.ts` + a fast-path in the `/api/assistant` route (before proxy + mock) that instantly answers greetings/thanks/good-byes/"what can you do". Verified in-browser (instant greeting, real questions unaffected). |
+| Jul 16, 2026 | **Sales-data dashboard fix** (built + verified, pending commit): the Dashboard broke on the multi-channel sales log (`Customer Data.xlsx`) — Revenue "—", only 4.7k of 589k units, no trend. Reworked `computeDashboard` + mapping + parser to support **inventory OR sales files** in one path: all-row totals, amount-column revenue, monthly trend from a date column, adaptive KPI cards (Orders/AOV vs Capital/Stockout), `hasInventory` flag hides inventory-only panels, compact-currency chart axes. Verified on the real 588k-row file (₹64.08 Cr / 589,398 units / 588,228 orders / 12-mo trend) and confirmed the sample inventory dashboard is unchanged. Details in the STATUS block. |
 | Jul 16, 2026 | **Multi-tenant prototype** (commit `c706322`): the big "do last" feedback item. Front-end company accounts + users + login + **company-scoped shared data warehouse**. `lib/authStore.ts` (companies/users/session, persisted, demo creds, seeds admin/demo), `components/AuthGate.tsx` (gates app + login/create-company screens), `app/team/page.tsx` (admin user mgmt + shared-data status), Sidebar footer (company/user/role/logout) + admin-only Team nav. `lib/store.ts` refactored: data keyed by companyId so any user's upload is shared across the company. Fixed a `getSnapshot` infinite-loop (useShallow on `useCompanyUsers`). Verified in-browser, clean console. **Prototype only — demo passwords in localStorage, not real auth.** |
 
 **NEW FEEDBACK (from meeting, given Jul 16):**

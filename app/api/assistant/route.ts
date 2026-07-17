@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMockResponse } from "@/lib/mock";
+import { getSmallTalk } from "@/lib/smalltalk";
 
 /**
  * THE INTEGRATION SEAM.
@@ -47,6 +48,19 @@ export async function POST(req: NextRequest) {
   }
 
   const started = Date.now();
+
+  // ── Small talk / gestures (greetings, thanks, "what can you do") ──────────
+  // Answer instantly and never send these through the heavy pipeline.
+  const small = getSmallTalk(message);
+  if (small) {
+    return NextResponse.json({
+      answer: small.answer,
+      criticValidated: small.criticValidated,
+      toolUsed: small.toolUsed,
+      latencyMs: Date.now() - started,
+    } satisfies AssistantResponse);
+  }
+
   const backendUrl = process.env.ASSISTANT_BACKEND_URL;
 
   // ── Ahmer's real backend (proxy) ──────────────────────────────────────────
