@@ -379,9 +379,13 @@ Match these when adding to the app so it stays consistent:
 
 ---
 
-## ▶▶ RESUME HERE (Jul 17 — upload fix DEPLOYED, pending Mayank's real-file confirmation)
+## ✅ Upload freeze — CONFIRMED FIXED (Jul 17)
 
-**Status:** the upload freeze fix is **built, verified as far as tooling allows, and shipped live** (commit `f55e8d4`). The **one open item** is Mayank uploading the real 30MB `Customer Data.xlsx` on `smartops-agent.vercel.app` and confirming there's no "Page unresponsive" and it finishes in ~25–30s. **Team share stays paused until he confirms.**
+**Status:** Mayank uploaded the real 30MB `Customer Data.xlsx` on the live site and confirmed it works — no more "Page unresponsive." Closed out.
+
+**Team accounts created + shared with the team for UI/UX feedback (Jul 17):** Mayank added Paola Whittier (`pwhittier`), Abdulrahman Almarwan (`aalmarwan`), and Ahmer Rizvi (`arizvi`) as members under CAVA via the **Team** tab (his own admin account is `mdev`) — see "Multi-tenant company accounts" above for how that flow works. Since they're added to CAVA (which already has the uploaded data), they land straight on the real dashboard without re-uploading. He's sending each their login privately + a short how-to-explore message. **This is the first external UI/UX feedback round for the product.**
+
+**Detail on the fix, kept for reference:**
 
 **What was wrong + what shipped (commit `f55e8d4`):**
 1. **Broken worker in prod (root cause of the freeze).** The earlier attempt (`62883e6`) used `new Worker(new URL('./upload.worker.ts', import.meta.url))`, which **Turbopack's production build does not compile** — it emitted the raw `.ts` to `static/media/`, so the worker failed to load in prod and parsing fell back to the **main thread → freeze**. Fixed by **pre-bundling the worker with esbuild** → `public/upload-worker.js` (`scripts/build-worker.mjs`, run via `prebuild`/`predev`), loaded as `new Worker("/upload-worker.js")`. Bundler-independent.
@@ -391,15 +395,15 @@ Match these when adding to the app so it stays consistent:
 - **node on the real 588k-row file:** parse ~26s (was ~75s); revenue ₹52.4Cr, returns 22.3%, 12-mo trend + geo/channel all correct with the new options.
 - **Prod build (`next start`) + live:** `/upload-worker.js` served as `application/javascript` 200 (344,877 bytes, live matches local); the worker **parse+compute** run correctly in the browser (dates parsed, Credit Note→return, revenue correct).
 
-**Still NOT verifiable by me (needs Mayank on real hardware):** the real 30MB in-browser upload — my in-app test browser is too CPU-constrained to trust responsiveness numbers, and I can't upload a 30MB file through it. Architecturally the worker runs on a separate thread so the main thread stays responsive; the ~26s parse happens off-thread behind the "Analyzing your data…" state.
+**Confirmed by Mayank on real hardware (Jul 17):** uploaded the real 30MB file on the live site — works, no freeze.
 
-**If Mayank still sees a freeze or it's too slow:** next levers — a streaming/row-by-row XLSX reader (e.g. exceljs) instead of loading all 588k rows, or ask users to export CSV (much faster to parse). The Web Worker is still the right core.
+**If a freeze ever recurs (e.g. an even larger file):** next levers — a streaming/row-by-row XLSX reader (e.g. exceljs) instead of loading all rows, or ask users to export CSV (much faster to parse). The Web Worker is still the right core.
 
 **Scratchpad perf scripts:** `scratchpad/salestest/perfone.js` (real-file timing, `node --max-old-space-size=4096 perfone.js true|false`), `perfopt.js` (read-option combos), `parsecheck.js` (correctness with the shipped options).
 
 ---
 
-## ▶ STATUS (Jul 16, 2026 — sales-data + chat fixes SHIPPED live)
+## ▶ STATUS (Jul 17, 2026 — upload freeze fixed + confirmed; shared with team for feedback)
 
 ✅ **ONE canonical version:** `github.com/mayankdev9/smartops-app` → **https://smartops-agent.vercel.app**
 = our **new UI** + **Ahmer's real 5-LLM + Critic backend**. Backend fork: `github.com/mayankdev9/smartops-backend` → Render `smartops-backend-mwof.onrender.com`.
@@ -467,7 +471,8 @@ Ahmer decoupled his pipeline into a standalone **FastAPI** repo (`github.com/ahm
 
 ### 📋 To-do / update ideas (Mayank, Jul 16)
 1. ✅ **Don't re-ask for company details on import** (commit `f4b5d66`, live). Onboarding Step 0 no longer asks for company name/type/SKU; it shows a read-only **company summary card** (name · type · admin, "Signed in") from `useCurrentCompany()` + keeps the optional "biggest headache" question. Removed unused `name`/`type`/`skus` state, the `business` import, and the `Field` component; Step 2 greeting uses `currentCompany.name`. (`app/onboarding/page.tsx`)
-2. ✅ **"Page unresponsive" on big-file upload — FIXED & DEPLOYED** (commit `f55e8d4`, live), pending Mayank's real-file confirmation. Root cause: the first worker attempt (`62883e6`) wasn't compiled by Turbopack's prod build → fell back to sync main-thread parse → freeze. Fix: pre-bundle the worker with esbuild (`public/upload-worker.js`, loaded as `new Worker("/upload-worker.js")`) **and** speed up `XLSX.read` (`dense` + skip flags) from ~75s → ~26s. Full detail + verification in the **▶▶ RESUME HERE** block. Only open item: Mayank uploads the real 30MB file on live and confirms no freeze.
+2. ✅ **"Page unresponsive" on big-file upload — FIXED, DEPLOYED, and CONFIRMED** (commit `f55e8d4`, live). Root cause: the first worker attempt (`62883e6`) wasn't compiled by Turbopack's prod build → fell back to sync main-thread parse → freeze. Fix: pre-bundle the worker with esbuild (`public/upload-worker.js`, loaded as `new Worker("/upload-worker.js")`) **and** speed up `XLSX.read` (`dense` + skip flags) from ~75s → ~26s. Full detail in the **✅ Upload freeze — CONFIRMED FIXED** section above. Mayank uploaded the real 30MB file on live on Jul 17 and confirmed it works.
+3. ✅ **Team accounts created for external feedback** (Jul 17). Mayank added Paola, Abdulrahman, and Ahmer as CAVA users via **Team** so they land on the shared uploaded data without re-uploading; sharing logins + a how-to-explore message privately. First external UI/UX feedback round — **watch for their input in a future session** and turn it into new to-do items here.
 
 Done in the Jul 11 enhancement pass (Batch 1):
 - [x] Deploy to Vercel — live at https://smartops-agent.vercel.app
@@ -494,7 +499,8 @@ Still open:
 
 ## Session log
 
-| Jul 17, 2026 | **Upload freeze FIXED & deployed** (commit `f55e8d4`, live). (1) The `62883e6` worker wasn't compiled by Turbopack's prod build (raw `.ts` in `static/media`) → sync fallback → freeze; fixed by pre-bundling the worker with **esbuild** → `public/upload-worker.js` (`scripts/build-worker.mjs`, `prebuild`/`predev`). (2) `XLSX.read` on the real file was ~75s; tuned read options (`dense:true` + skip formula/style/HTML/text) → ~26s, identical results (node-verified: ₹52.4Cr, 22.3% returns, trend/geo/channel intact). Verified worker serves + parses in a `next start` prod build and on live. **Open:** Mayank to confirm the real 30MB in-browser upload has no "Page unresponsive". |
+| Jul 17, 2026 | **Team accounts created + product shared for first external UI/UX feedback round.** Mayank added Paola Whittier (`pwhittier`), Abdulrahman Almarwan (`aalmarwan`), and Ahmer Rizvi (`arizvi`) as CAVA members via **Team**, so they land on the already-uploaded real data without re-uploading; sent each their login + a how-to-explore message privately. Follows the confirmed upload fix below. |
+| Jul 17, 2026 | **Upload freeze FIXED, deployed, and CONFIRMED by Mayank** (commit `f55e8d4`, live). (1) The `62883e6` worker wasn't compiled by Turbopack's prod build (raw `.ts` in `static/media`) → sync fallback → freeze; fixed by pre-bundling the worker with **esbuild** → `public/upload-worker.js` (`scripts/build-worker.mjs`, `prebuild`/`predev`). (2) `XLSX.read` on the real file was ~75s; tuned read options (`dense:true` + skip formula/style/HTML/text) → ~26s, identical results (node-verified: ₹52.4Cr, 22.3% returns, trend/geo/channel intact). Verified worker serves + parses in a `next start` prod build and on live; Mayank then uploaded the real 30MB file on the live site and confirmed no "Page unresponsive." **Closed.** |
 | Jul 16, 2026 | **Crash fix — "This page couldn't load"** (commit `9d66743`, live): a file uploaded before the geoBreakdown/channel/payment/returns fields existed was persisted in localStorage without them; the new UI read `d.geoBreakdown.length` on that stale object and crashed the whole page. Added `normalizeDashboard()` (backfills any missing `DashboardData` fields) and run it from the data store's persist `merge`, so old saved records self-heal on load (no lost uploads, no per-render allocation); also made `buildBusinessContext` tolerant of missing arrays. Reproduced the crash with old-shape data on the live site, then confirmed the fix renders it. **Lesson: when adding non-optional `DashboardData` fields, they must be backfilled for persisted data.** |
 | Jul 16, 2026 | **Geography / channel / payment / returns analytics** (commit `0314c7c`, live): richer sales-file analytics. `mapping.ts` detects state/channel/payment/voucher-type columns; `analytics.ts` identifies returns (Credit Note voucher type or negative amounts), reports them separately, and makes the Revenue KPI **gross sales** (₹52.4Cr — matches the backend's ₹524M) with a "before ₹X returned" sub; adds `geoBreakdown`/`channelBreakdown`/`paymentBreakdown` (gross, blank buckets dropped) + a returns summary (rate/value/units/top returned SKUs). Dashboard gains Revenue-by-state/channel/payment bars + a Returns card for sales files; the Assistant's `fallbackChart` now covers geography/channel/payment/returns; `buildBusinessContext` forwards them. Verified on the real 588k-row file (returns 22.3% ₹11.7Cr; states Maharashtra/Karnataka/Delhi; channels Shopify/Myntra; payment Prepaid/COD) and in-browser (all panels + assistant geo chart render, no console errors). Note: this file's Credit Notes carry blank SKU/payment, so returns-by-product is empty and the Returns card says so. |
 | Jul 16, 2026 | **Assistant charts on uploaded data** (commit `1d49bad`, live): the backend charts its static-data answers but the uploaded-data path (`toolUsed=uploaded_business_context`) returns `chart:null`, so post-upload answers had no graph. Added a client-side fallback in `app/assistant/page.tsx` (`fallbackChart()`): when there's no backend chart and we're on uploaded (non-sample) data, draw a ChartSpec from the Dashboard's computed data (revenue-trend line or top-SKU bar) based on the question; geography/returns/payment/channel questions get no chart (we don't compute that on upload) so nothing misleading shows. Verified live that `AssistantChart` renders backend charts (the "Revenue by SKU Code" bar on sample data). |
@@ -533,4 +539,4 @@ Still open:
 
 ---
 
-*Last updated: 2026-07-11*
+*Last updated: 2026-07-17*
