@@ -379,6 +379,38 @@ Match these when adding to the app so it stays consistent:
 
 ---
 
+## ▶▶ RESUME HERE (paused Jul 16 eve — finish the upload "Page unresponsive" fix)
+
+**Goal for tomorrow:** make uploading the real 30MB / ~588k-row `Customer Data.xlsx` NOT freeze the tab, verify it, then deploy. Only after that: share the link with the team (paused until upload is smooth).
+
+**Where we are**
+- The **live site still freezes** on big-file upload. The deployed Web-Worker attempt (`62883e6`) is broken in the Turbopack **production** build (see to-do #2) → it silently falls back to synchronous main-thread parsing.
+- A **fix is built locally but UNCOMMITTED**: pre-bundle the worker with **esbuild** into `public/upload-worker.js` and load it as `new Worker("/upload-worker.js")` (bundler-independent, so Turbopack can't mangle it).
+
+**Uncommitted working-tree changes (on disk, not pushed — don't lose these):**
+- `M lib/uploadSession.ts` — worker URL changed to `"/upload-worker.js"`
+- `M package.json` — added `build:worker` + `prebuild` + `predev` scripts (run `scripts/build-worker.mjs`) and `esbuild` devDep
+- `M package-lock.json` — esbuild
+- `?? scripts/build-worker.mjs` — esbuild bundler for the worker (stubs node builtins for SheetJS)
+- `?? public/upload-worker.js` — the built 336KB classic worker (xlsx + parse + computeDashboard)
+- (`lib/upload.worker.ts` from `62883e6` is now the esbuild ENTRY, no longer imported by app code)
+
+**Verified so far (trustworthy):** esbuild bundle builds; `next build` + `next start` on :3100 serves `/upload-worker.js` as `application/javascript` 200; the worker loads and parses correctly in isolation. So the worker mechanism works in a production build.
+
+**NOT verified / open questions:**
+1. **Can't trust responsiveness numbers from the in-app test browser** — it's CPU-constrained (parsed 120k synthetic CSV rows in ~12–15s with multi-second main-thread stalls). Those absolute numbers are NOT representative of real Chrome. Need to confirm on real hardware with the real XLSX file.
+2. **Parse-speed:** was mid-way measuring the REAL file's parse time in **node** (reliable), comparing `cellDates:true` vs `false`. Hypothesis: `cellDates` coerces every cell and is slow on CSV; the real file is XLSX (faster path). If `cellDates:false` is much faster AND keeps dates correct (our `toDate()` already converts Excel **serial numbers**, so it should), drop `cellDates` in `parseArrayBuffer` to speed things up. (node perf test = `scratchpad/salestest/perf.js`; run didn't finish before pausing.)
+
+**Next steps (in order):**
+1. Finish the node perf test (`perf.js`) → get real parse time + confirm `cellDates:false` keeps the revenue trend months correct. Decide whether to drop `cellDates`.
+2. If keeping the esbuild approach: commit the uncommitted changes; if there's real value, consider committing to a branch first and deploying to a Vercel **preview** URL to test the real file off-prod.
+3. Deploy, then have Mayank upload the real file and confirm no "Page unresponsive."
+4. If the worker still isn't enough (very large parse), consider: dropping `cellDates`, a lighter/faster parser, or chunked reading. Web Worker is still the right core fix.
+
+**Reminder:** don't tell Mayank it's "fixed" again until the real file is verified — that's happened twice now (dev-only pass, then broken-in-prod worker).
+
+---
+
 ## ▶ STATUS (Jul 16, 2026 — sales-data + chat fixes SHIPPED live)
 
 ✅ **ONE canonical version:** `github.com/mayankdev9/smartops-app` → **https://smartops-agent.vercel.app**
@@ -447,7 +479,7 @@ Ahmer decoupled his pipeline into a standalone **FastAPI** repo (`github.com/ahm
 
 ### 📋 To-do / update ideas (Mayank, Jul 16)
 1. ✅ **Don't re-ask for company details on import** (commit `f4b5d66`, live). Onboarding Step 0 no longer asks for company name/type/SKU; it shows a read-only **company summary card** (name · type · admin, "Signed in") from `useCurrentCompany()` + keeps the optional "biggest headache" question. Removed unused `name`/`type`/`skus` state, the `business` import, and the `Field` component; Step 2 greeting uses `currentCompany.name`. (`app/onboarding/page.tsx`)
-2. ✅ **"Page unresponsive" on big-file upload** (commit `62883e6`, live). Parsing + aggregating the 30MB / ~600k-row file ran synchronously on the main thread and froze the tab. Moved it into a **Web Worker** (`lib/upload.worker.ts` + `lib/uploadSession.ts`; `parseArrayBuffer()` extracted from `parseUpload.ts`) so the UI stays responsive; onboarding shows an "Analyzing your data…" state. Synchronous fallback if a worker can't start, so upload never breaks. Verified end-to-end on localhost (parse + compute both in the worker, no errors). **Not verifiable with the real 30MB file via tooling — Mayank/teammates should confirm the freeze is gone.**
+2. 🚧 **"Page unresponsive" on big-file upload — IN PROGRESS, NOT YET FIXED ON LIVE.** See the **▶ RESUME HERE** block below for full state. Short version: the first attempt (commit `62883e6`, currently live) moved parse+compute into a Web Worker via `new Worker(new URL('./upload.worker.ts', import.meta.url))` — but **Turbopack's production build does NOT compile that pattern** (it emitted the raw `.ts` to `static/media/`), so the worker fails to load in prod and the code falls back to the **synchronous main-thread path → still freezes**. (Dev worked, prod didn't — that's why the earlier "fixed" claim was wrong and Mayank still saw the freeze.) A second fix (pre-bundle the worker with esbuild → `public/upload-worker.js`) is **built locally but uncommitted and not verified on the real 30MB file**.
 
 Done in the Jul 11 enhancement pass (Batch 1):
 - [x] Deploy to Vercel — live at https://smartops-agent.vercel.app
