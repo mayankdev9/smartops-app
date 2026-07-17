@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Activity, AlertCircle, ArrowRight, Check, FileSpreadsheet, Loader2, MessageCircle, Sparkles, Upload } from "lucide-react";
-import { parseUpload, type ParsedUpload } from "@/lib/parseUpload";
 import { autoDetectMapping, FIELDS, isMappingValid, type Mapping } from "@/lib/mapping";
-import { businessHealth, computeDashboard } from "@/lib/analytics";
+import { businessHealth } from "@/lib/analytics";
+import { UploadSession, type ParsedMeta } from "@/lib/uploadSession";
 import { useDashboardData, useDataStore } from "@/lib/store";
 import { useCurrentCompany, useCurrentUser } from "@/lib/authStore";
 
@@ -32,15 +32,21 @@ export default function OnboardingPage() {
   const currentUser = useCurrentUser();
   const [step, setStep] = useState(0);
   const [connected, setConnected] = useState(false);
-  const [parsed, setParsed] = useState<ParsedUpload | null>(null);
+  const [parsed, setParsed] = useState<ParsedMeta | null>(null);
+  const [fileName, setFileName] = useState("");
   const [parseError, setParseError] = useState<string | null>(null);
   const [parsing, setParsing] = useState(false);
+  const [computing, setComputing] = useState(false);
   const [mapping, setMapping] = useState<Mapping>({});
   const [currency, setCurrency] = useState("₹");
   const [concern, setConcern] = useState("");
+  const sessionRef = useRef<UploadSession | null>(null);
   const d = useDashboardData();
   const health = businessHealth(d);
   const healthStyle = HEALTH_STYLES[health.tone];
+
+  // Tear down any worker when leaving the page.
+  useEffect(() => () => sessionRef.current?.dispose(), []);
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -50,9 +56,13 @@ export default function OnboardingPage() {
     setParsed(null);
     setMapping({});
     try {
-      const result = await parseUpload(file);
-      setParsed(result);
-      setMapping(autoDetectMapping(result.columns));
+      sessionRef.current?.dispose();
+      const session = new UploadSession();
+      sessionRef.current = session;
+      const meta = await session.parse(file); // parses in a Web Worker (UI stays responsive)
+      setParsed(meta);
+      setFileName(file.name);
+      setMapping(autoDetectMapping(meta.columns));
       setConnected(true);
     } catch (err) {
       setParseError(err instanceof Error ? err.message : "Could not read that file.");
@@ -63,12 +73,19 @@ export default function OnboardingPage() {
     }
   }
 
-  // Compute the dashboard from the uploaded rows + mapping and store it.
-  function finish() {
-    if (parsed && isMappingValid(mapping)) {
-      if (currentCompany) {
-        setData(currentCompany.id, computeDashboard(parsed.rows, mapping, currency, parsed.fileName), currentUser?.name ?? "a teammate");
+  // Compute the dashboard (in the worker) from the parsed rows + mapping and store it.
+  async function finish() {
+    if (parsed && isMappingValid(mapping) && sessionRef.current) {
+      setComputing(true);
+      try {
+        const data = await sessionRef.current.compute(mapping, currency, fileName);
+        if (currentCompany) setData(currentCompany.id, data, currentUser?.name ?? "a teammate");
+      } catch (err) {
+        setParseError(err instanceof Error ? err.message : "Could not process your data.");
+        setComputing(false);
+        return;
       }
+      setComputing(false);
     }
     setStep(2);
   }
@@ -198,7 +215,7 @@ export default function OnboardingPage() {
                 <SourceCard
                   icon={<FileSpreadsheet size={18} className="text-emerald-600" />}
                   title="Excel / CSV"
-                  sub={parsed ? `${parsed.fileName} ✓` : "Upload above"}
+                  sub={parsed ? `${fileName} ✓` : "Upload above"}
                   active={!!parsed}
                 />
                 <SourceCard
@@ -318,10 +335,17 @@ export default function OnboardingPage() {
                 </button>
                 <button
                   onClick={finish}
-                  disabled={!!parsed && !canUseData}
-                  className="flex-1 rounded-lg bg-brand py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:opacity-40"
+                  disabled={computing || (!!parsed && !canUseData)}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-brand py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:opacity-40"
                 >
-                  {canUseData ? "Use my data →" : parsed ? "Map required fields to continue" : "Skip — use sample data"}
+                  {computing && <Loader2 size={15} className="animate-spin" />}
+                  {computing
+                    ? "Analyzing your data…"
+                    : canUseData
+                      ? "Use my data →"
+                      : parsed
+                        ? "Map required fields to continue"
+                        : "Skip — use sample data"}
                 </button>
               </div>
             </div>

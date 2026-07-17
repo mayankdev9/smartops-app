@@ -3,18 +3,25 @@
 
 import * as XLSX from "xlsx";
 
-export interface ParsedUpload {
-  fileName: string;
+export interface ParsedData {
   columns: string[];
   rowCount: number;
   rows: Record<string, string | number>[]; // all rows (for computing metrics)
   preview: Record<string, string | number>[]; // first few rows (for the UI table)
 }
 
+export interface ParsedUpload extends ParsedData {
+  fileName: string;
+}
+
 const MAX_PREVIEW_ROWS = 5;
 
-export async function parseUpload(file: File): Promise<ParsedUpload> {
-  const buf = await file.arrayBuffer();
+/**
+ * Parse a spreadsheet from an ArrayBuffer. This is the heavy part (a 30MB / ~600k
+ * row export can take several seconds) and is deliberately buffer-based so it can
+ * run inside a Web Worker (see lib/upload.worker.ts) and keep the UI responsive.
+ */
+export function parseArrayBuffer(buf: ArrayBuffer): ParsedData {
   const wb = XLSX.read(buf, { type: "array", cellDates: true });
 
   const firstSheet = wb.SheetNames[0];
@@ -28,11 +35,10 @@ export async function parseUpload(file: File): Promise<ParsedUpload> {
   if (rows.length === 0) throw new Error("No rows found — is the first row a header?");
 
   const columns = Object.keys(rows[0]);
-  return {
-    fileName: file.name,
-    columns,
-    rowCount: rows.length,
-    rows,
-    preview: rows.slice(0, MAX_PREVIEW_ROWS),
-  };
+  return { columns, rowCount: rows.length, rows, preview: rows.slice(0, MAX_PREVIEW_ROWS) };
+}
+
+export async function parseUpload(file: File): Promise<ParsedUpload> {
+  const buf = await file.arrayBuffer();
+  return { fileName: file.name, ...parseArrayBuffer(buf) };
 }
