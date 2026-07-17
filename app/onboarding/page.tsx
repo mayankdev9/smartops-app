@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Activity, AlertCircle, ArrowRight, Check, FileSpreadsheet, Loader2, MessageCircle, Sparkles, Upload } from "lucide-react";
-import { business } from "@/lib/data";
 import { parseUpload, type ParsedUpload } from "@/lib/parseUpload";
 import { autoDetectMapping, FIELDS, isMappingValid, type Mapping } from "@/lib/mapping";
 import { businessHealth, computeDashboard } from "@/lib/analytics";
@@ -32,9 +31,6 @@ export default function OnboardingPage() {
   const currentCompany = useCurrentCompany();
   const currentUser = useCurrentUser();
   const [step, setStep] = useState(0);
-  const [name, setName] = useState("");
-  const [type, setType] = useState(business.type);
-  const [skus, setSkus] = useState(String(business.skuCount));
   const [connected, setConnected] = useState(false);
   const [parsed, setParsed] = useState<ParsedUpload | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
@@ -117,30 +113,35 @@ export default function OnboardingPage() {
         <div className="rounded-xl border border-slate-200 bg-white p-6">
           {step === 0 && (
             <div className="space-y-4">
-              <h3 className="text-lg font-bold text-slate-900">Tell us about your business</h3>
-              <Field label="Business name" value={name} onChange={setName} placeholder="Your company name" />
+              <h3 className="text-lg font-bold text-slate-900">Set up your data</h3>
+              {currentCompany && (
+                <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-sm font-bold text-brand">
+                    {currentCompany.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-900">{currentCompany.name}</p>
+                    <p className="truncate text-xs text-slate-500">
+                      {currentCompany.type}
+                      {currentUser ? ` · ${currentUser.name}` : ""}
+                    </p>
+                  </div>
+                  <span className="ml-auto shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                    Signed in
+                  </span>
+                </div>
+              )}
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Business type</label>
-                <select
-                  value={type}
-                  onChange={(e) => setType(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
-                >
-                  <option>FMCG / General-Trade Distributor</option>
-                  <option>Wholesale / Cash &amp; Carry</option>
-                  <option>Pharma Distributor</option>
-                  <option>Electronics / Hardware Distributor</option>
-                </select>
-              </div>
-              <Field label="Approx. number of SKUs" value={skus} onChange={setSkus} type="number" />
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">What&apos;s your biggest operational headache right now?</label>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                  What&apos;s your biggest operational headache right now?{" "}
+                  <span className="font-normal text-slate-400">(optional)</span>
+                </label>
                 <div className="flex flex-wrap gap-2">
                   {CONCERNS.map((c) => (
                     <button
                       key={c}
                       type="button"
-                      onClick={() => setConcern(c)}
+                      onClick={() => setConcern(concern === c ? "" : c)}
                       className={`rounded-full border px-3 py-1.5 text-sm transition ${
                         concern === c ? "border-brand bg-blue-50 text-brand" : "border-slate-300 text-slate-600 hover:bg-slate-50"
                       }`}
@@ -154,7 +155,7 @@ export default function OnboardingPage() {
                 onClick={() => setStep(1)}
                 className="mt-2 w-full rounded-lg bg-brand py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark"
               >
-                Continue
+                Continue to upload
               </button>
             </div>
           )}
@@ -333,7 +334,7 @@ export default function OnboardingPage() {
                   <Activity size={22} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900">Here&apos;s what SmartOps found{name.trim() ? `, ${name.trim().split(" ")[0]}` : ""}</h3>
+                  <h3 className="text-lg font-bold text-slate-900">Here&apos;s what SmartOps found{currentCompany ? `, ${currentCompany.name}` : ""}</h3>
                   <p className="text-sm text-slate-500">
                     {d.isSample
                       ? "Based on sample data — upload your file for a read on your own numbers."
@@ -395,33 +396,6 @@ export default function OnboardingPage() {
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  type = "text",
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  type?: string;
-  placeholder?: string;
-}) {
-  return (
-    <div>
-      <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
-      <input
-        type={type}
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100"
-      />
     </div>
   );
 }

@@ -445,6 +445,9 @@ Ahmer decoupled his pipeline into a standalone **FastAPI** repo (`github.com/ahm
 
 ## Next steps (enhancements)
 
+### 📋 To-do / update ideas (Mayank, Jul 16)
+1. ✅ **Don't re-ask for company details on import** (done — commit pending). Onboarding Step 0 no longer asks for company name/type/SKU; it shows a read-only **company summary card** (name · type · admin, "Signed in") pulled from `useCurrentCompany()` + keeps the optional "biggest headache" question. Removed the unused `name`/`type`/`skus` state, the `business` import, and the `Field` component; Step 2 greeting now uses `currentCompany.name`. (`app/onboarding/page.tsx`)
+
 Done in the Jul 11 enhancement pass (Batch 1):
 - [x] Deploy to Vercel — live at https://smartops-agent.vercel.app
 - [x] Mobile responsiveness — sidebar → hamburger drawer on small screens
