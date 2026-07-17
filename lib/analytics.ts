@@ -191,18 +191,45 @@ function toItems(rows: Record<string, unknown>[], m: Mapping): Item[] {
   return [...byName.values()];
 }
 
+/**
+ * Backfill any missing fields on a DashboardData. Data persisted by an older
+ * build (e.g. before geoBreakdown / returns existed) would otherwise crash the
+ * new UI when it reads `d.geoBreakdown.length`. Applied when rehydrating the
+ * store, so downstream code always sees a complete, stable object.
+ */
+export function normalizeDashboard(d: Partial<DashboardData> | null | undefined): DashboardData {
+  const b = d ?? {};
+  return {
+    source: b.source ?? "Uploaded data",
+    isSample: b.isSample ?? false,
+    currency: b.currency ?? "₹",
+    hasInventory: b.hasInventory ?? false,
+    kpiCards: b.kpiCards ?? [],
+    insights: b.insights ?? [],
+    abcBreakdown: b.abcBreakdown ?? [],
+    topSkus: b.topSkus ?? [],
+    stockoutRisks: b.stockoutRisks ?? [],
+    slowMovers: b.slowMovers ?? [],
+    revenueTrend: b.revenueTrend ?? [],
+    geoBreakdown: b.geoBreakdown ?? [],
+    channelBreakdown: b.channelBreakdown ?? [],
+    paymentBreakdown: b.paymentBreakdown ?? [],
+    returns: b.returns ?? null,
+  };
+}
+
 // Map our computed dashboard into the businessContext shape Ahmer's backend
 // reads (kpiCards / skuBreakdown / revenueTrend / currency). When it's the sample
 // (no upload), return {} so the backend answers from its own rich static data.
 export function buildBusinessContext(d: DashboardData): Record<string, unknown> {
   if (d.isSample) return {};
   const ctx: Record<string, unknown> = { currency: d.currency };
-  ctx.kpiCards = d.kpiCards.map((c) => ({ metric: c.label, value: c.value, note: c.sub ?? "" }));
-  if (d.topSkus.length) ctx.skuBreakdown = d.topSkus.map((s) => ({ sku: s.sku, units: s.units }));
-  if (d.revenueTrend.length) ctx.revenueTrend = d.revenueTrend;
-  if (d.geoBreakdown.length) ctx.geoBreakdown = d.geoBreakdown;
-  if (d.channelBreakdown.length) ctx.channelBreakdown = d.channelBreakdown;
-  if (d.paymentBreakdown.length) ctx.paymentBreakdown = d.paymentBreakdown;
+  ctx.kpiCards = (d.kpiCards ?? []).map((c) => ({ metric: c.label, value: c.value, note: c.sub ?? "" }));
+  if (d.topSkus?.length) ctx.skuBreakdown = d.topSkus.map((s) => ({ sku: s.sku, units: s.units }));
+  if (d.revenueTrend?.length) ctx.revenueTrend = d.revenueTrend;
+  if (d.geoBreakdown?.length) ctx.geoBreakdown = d.geoBreakdown;
+  if (d.channelBreakdown?.length) ctx.channelBreakdown = d.channelBreakdown;
+  if (d.paymentBreakdown?.length) ctx.paymentBreakdown = d.paymentBreakdown;
   if (d.returns) {
     ctx.returns = {
       ratePct: d.returns.ratePct,

@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { DashboardData } from "./analytics";
+import { normalizeDashboard, type DashboardData } from "./analytics";
 import { sampleDashboard } from "./data";
 import { useAuthStore } from "./authStore";
 
@@ -35,7 +35,19 @@ export const useDataStore = create<DataState>()(
           return { records: next };
         }),
     }),
-    { name: "smartops-data" },
+    {
+      name: "smartops-data",
+      // Backfill any records saved by an older build so the new UI never reads a
+      // missing field (e.g. geoBreakdown) and crashes. Runs once on rehydration.
+      merge: (persisted, current) => {
+        const p = persisted as { records?: Record<string, CompanyRecord> } | undefined;
+        const records: Record<string, CompanyRecord> = {};
+        for (const [id, rec] of Object.entries(p?.records ?? {})) {
+          records[id] = { ...rec, data: normalizeDashboard(rec?.data) };
+        }
+        return { ...current, records };
+      },
+    },
   ),
 );
 
