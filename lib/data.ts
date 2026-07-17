@@ -153,4 +153,8 @@ export const sampleDashboard: DashboardData = {
   stockoutRisks,
   slowMovers,
   revenueTrend,
+  geoBreakdown: [],
+  channelBreakdown: [],
+  paymentBreakdown: [],
+  returns: null,
 };

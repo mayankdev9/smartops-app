@@ -5,7 +5,7 @@ import { BadgeCheck, Send, Sparkles, Trash2 } from "lucide-react";
 import Markdown from "@/components/Markdown";
 import AssistantChart, { type ChartSpec } from "@/components/AssistantChart";
 import { useDashboardData } from "@/lib/store";
-import { buildBusinessContext, type DashboardData } from "@/lib/analytics";
+import { buildBusinessContext, type DashboardData, type Breakdown } from "@/lib/analytics";
 
 interface Message {
   role: "user" | "assistant";
@@ -51,17 +51,21 @@ const STORAGE_KEY = "smartops-chat";
 // The backend charts its static-data answers, but the uploaded-data path
 // (toolUsed=uploaded_business_context) returns chart:null. When we're on uploaded
 // data and the question maps to something the Dashboard already computed, draw a
-// chart from that so answers about your own data still get a graph. Topics the
-// upload doesn't compute (geography/returns/payments/channels) get no chart.
+// chart from that so answers about your own data still get a graph. When we have
+// no matching data (e.g. product-level returns aren't in the file) we return null
+// so nothing misleading shows.
 function fallbackChart(question: string, d: DashboardData): ChartSpec | null {
   if (d.isSample) return null;
   const q = question.toLowerCase();
-  if (/(state|region|city|geograph|return|refund|payment|prepaid|\bcod\b|channel)/.test(q)) return null;
+  const bar = (title: string, data: Breakdown[]): ChartSpec | null => (data.length ? { type: "bar", title, data } : null);
+
+  if (/(state|region|province|geograph|location|\bwhere\b)/.test(q)) return bar("Revenue by state", d.geoBreakdown);
+  if (/(channel|marketplace|platform|shopify|amazon|myntra|ajio|nyka|flipkart)/.test(q)) return bar("Revenue by channel", d.channelBreakdown);
+  if (/(payment|prepaid|\bcod\b|cash on delivery)/.test(q)) return bar("Revenue by payment method", d.paymentBreakdown);
+  if (/(return|refund|credit note)/.test(q)) return d.returns ? bar("Most returned products", d.returns.byProduct) : null;
 
   const wantsSku = /(product|sku|item|top.?sell|best.?sell|top.?product)/.test(q);
   const wantsTrend = /(revenue|sales|trend|month|season|growth|grew|declin|overall|summary|health|performance)/.test(q);
-  if (!wantsSku && !wantsTrend) return null;
-
   const skuChart = (): ChartSpec | null =>
     d.topSkus.length ? { type: "bar", title: "Top SKUs by units", data: d.topSkus.map((s) => ({ name: s.sku, value: s.units })) } : null;
   const trendChart = (): ChartSpec | null =>
@@ -70,7 +74,8 @@ function fallbackChart(question: string, d: DashboardData): ChartSpec | null {
       : null;
 
   if (wantsSku) return skuChart() ?? trendChart();
-  return trendChart() ?? skuChart();
+  if (wantsTrend) return trendChart() ?? skuChart();
+  return null;
 }
 
 export default function ChatPage() {

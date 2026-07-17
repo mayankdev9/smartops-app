@@ -57,6 +57,24 @@ function compact(currency: string, n: number): string {
   return `${currency}${Math.round(n)}`;
 }
 
+// Horizontal revenue bar for a {name, value}[] breakdown (state/channel/payment).
+function BreakdownBar({ data, currency }: { data: { name: string; value: number }[]; currency: string }) {
+  return (
+    <ResponsiveContainer width="100%" height={Math.max(150, data.length * 30)}>
+      <BarChart data={data} layout="vertical" margin={{ left: 8, right: 16, top: 2, bottom: 2 }}>
+        <XAxis type="number" tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} tickFormatter={(v) => compact(currency, Number(v))} />
+        <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#475569" }} width={100} tickLine={false} axisLine={false} />
+        <Tooltip
+          cursor={{ fill: "#f1f5f9" }}
+          contentStyle={{ borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 12 }}
+          formatter={(v) => [compact(currency, Number(v)), "Revenue"]}
+        />
+        <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={15} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
 function InsightCard({ insight }: { insight: Insight }) {
   const s = INSIGHT_STYLES[insight.tone];
   return (
@@ -331,6 +349,59 @@ export default function DashboardPage() {
           </Card>
           )}
         </div>
+
+        {/* Sales-file breakdowns: geography, channel, payment, returns */}
+        {!d.hasInventory && (d.geoBreakdown.length > 0 || d.channelBreakdown.length > 0) && (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {d.geoBreakdown.length > 0 && (
+              <Card title="Revenue by state">
+                <BreakdownBar data={d.geoBreakdown} currency={d.currency} />
+              </Card>
+            )}
+            {d.channelBreakdown.length > 0 && (
+              <Card title="Revenue by channel">
+                <BreakdownBar data={d.channelBreakdown} currency={d.currency} />
+              </Card>
+            )}
+          </div>
+        )}
+        {!d.hasInventory && (d.paymentBreakdown.length > 0 || d.returns) && (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {d.paymentBreakdown.length > 0 && (
+              <Card title="Revenue by payment method">
+                <BreakdownBar data={d.paymentBreakdown} currency={d.currency} />
+              </Card>
+            )}
+            {d.returns && (
+              <Card title="Returns">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-bold text-slate-900">{d.returns.ratePct}%</span>
+                  <span className="text-sm text-slate-500">return rate</span>
+                </div>
+                <p className="mt-1 text-sm text-slate-600">
+                  {compact(d.currency, d.returns.value)} returned · {d.returns.units.toLocaleString()} units
+                </p>
+                {d.returns.byProduct.length > 0 ? (
+                  <div className="mt-3">
+                    <p className="mb-1.5 text-xs font-medium text-slate-500">Most returned by value</p>
+                    <ul className="space-y-1">
+                      {d.returns.byProduct.slice(0, 5).map((p) => (
+                        <li key={p.name} className="flex items-center justify-between gap-2 text-sm">
+                          <span className="truncate text-slate-700">{p.name}</span>
+                          <span className="shrink-0 text-slate-500">{compact(d.currency, p.value)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <p className="mt-3 text-xs text-slate-400">
+                    Your file doesn&apos;t break returns down by product.
+                  </p>
+                )}
+              </Card>
+            )}
+          </div>
+        )}
 
         {/* Slow-movers (inventory files only) */}
         {d.hasInventory && (

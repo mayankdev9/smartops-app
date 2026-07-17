@@ -19,6 +19,18 @@ export interface KpiCard {
   tone?: "up" | "warn" | "default";
 }
 
+export interface Breakdown {
+  name: string;
+  value: number;
+}
+
+export interface ReturnsSummary {
+  ratePct: number; // returns value as % of gross sales
+  value: number; // total returns value (positive)
+  units: number; // units returned
+  byProduct: Breakdown[]; // top returned SKUs by return value
+}
+
 export interface DashboardData {
   source: string; // "Sample data" or the uploaded file name
   isSample: boolean;
@@ -31,6 +43,11 @@ export interface DashboardData {
   stockoutRisks: StockoutRisk[];
   slowMovers: SlowMover[];
   revenueTrend: { day: string; revenue: number }[]; // empty when the file has no dates
+  // Sales-file breakdowns (empty/null for inventory files or when the column is absent):
+  geoBreakdown: Breakdown[]; // revenue by state/region
+  channelBreakdown: Breakdown[]; // revenue by sales channel
+  paymentBreakdown: Breakdown[]; // revenue by payment method
+  returns: ReturnsSummary | null; // net of returns when a voucher-type/negative-amount signal exists
 }
 
 const ABC_COLORS = ["#1d4ed8", "#60a5fa", "#cbd5e1"];
@@ -126,6 +143,25 @@ function makeRowRevenue(m: Mapping): (r: Record<string, unknown>) => number {
   return () => 0;
 }
 
+/**
+ * A row is a return when a voucher-type column marks it (Credit Note / Return /
+ * Refund) or, failing that column, when its amount/quantity is negative. Returns
+ * subtract from revenue and units so totals are net, not gross.
+ */
+function isReturnRow(row: Record<string, unknown>, m: Mapping): boolean {
+  if (m.voucherType) return /credit|return|refund|debit\s*note/i.test(String(row[m.voucherType] ?? ""));
+  const rev = m.amount ? toNum(row[m.amount]) : m.price ? toNum(row[m.price]) * (m.unitsSold ? toNum(row[m.unitsSold]) : 0) : 0;
+  const units = m.unitsSold ? toNum(row[m.unitsSold]) : 0;
+  return rev < 0 || units < 0;
+}
+
+/** True when the file carries any returns signal (voucher-type col or negatives). */
+function fileHasReturns(rows: Record<string, unknown>[], m: Mapping): boolean {
+  if (m.voucherType) return rows.some((r) => isReturnRow(r, m));
+  if (!m.amount && !m.price && !m.unitsSold) return false;
+  return rows.some((r) => isReturnRow(r, m));
+}
+
 /** Aggregate rows by product (handles both transaction logs and inventory snapshots). */
 function toItems(rows: Record<string, unknown>[], m: Mapping): Item[] {
   const rowRevenue = makeRowRevenue(m);
@@ -133,11 +169,13 @@ function toItems(rows: Record<string, unknown>[], m: Mapping): Item[] {
   for (const row of rows) {
     const name = String(row[m.product as string] ?? "").trim();
     if (!name) continue;
-    const sold = m.unitsSold ? toNum(row[m.unitsSold]) : 0;
+    // Net-aware: a return row subtracts its units and revenue from the SKU.
+    const sign = isReturnRow(row, m) ? -1 : 1;
+    const sold = (m.unitsSold ? Math.abs(toNum(row[m.unitsSold])) : 0) * sign;
     const onHand = m.onHand ? toNum(row[m.onHand]) : 0;
     const price = m.price ? toNum(row[m.price]) : 0;
     const cost = m.cost ? toNum(row[m.cost]) : 0;
-    const revenue = rowRevenue(row);
+    const revenue = Math.abs(rowRevenue(row)) * sign;
 
     const existing = byName.get(name);
     if (existing) {
@@ -162,6 +200,17 @@ export function buildBusinessContext(d: DashboardData): Record<string, unknown> 
   ctx.kpiCards = d.kpiCards.map((c) => ({ metric: c.label, value: c.value, note: c.sub ?? "" }));
   if (d.topSkus.length) ctx.skuBreakdown = d.topSkus.map((s) => ({ sku: s.sku, units: s.units }));
   if (d.revenueTrend.length) ctx.revenueTrend = d.revenueTrend;
+  if (d.geoBreakdown.length) ctx.geoBreakdown = d.geoBreakdown;
+  if (d.channelBreakdown.length) ctx.channelBreakdown = d.channelBreakdown;
+  if (d.paymentBreakdown.length) ctx.paymentBreakdown = d.paymentBreakdown;
+  if (d.returns) {
+    ctx.returns = {
+      ratePct: d.returns.ratePct,
+      value: d.returns.value,
+      units: d.returns.units,
+      topReturnedProducts: d.returns.byProduct,
+    };
+  }
   return ctx;
 }
 
@@ -180,23 +229,72 @@ export function computeDashboard(
   const hasRevenue = hasAmount || hasPrice;
   const hasInventory = hasOnHand;
 
-  // Totals come from EVERY row, so a sales log with sparse SKU codes still
-  // counts all units/revenue (not just the coded subset).
+  // Totals come from EVERY row (so a sales log with sparse SKU codes still counts
+  // all units/revenue), netting out returns (Credit Notes / negative amounts).
   const rowRevenue = makeRowRevenue(mapping);
   const rowUnits = (r: Record<string, unknown>) => (mapping.unitsSold ? toNum(r[mapping.unitsSold]) : 0);
-  const totalUnits = rows.reduce((s, r) => s + rowUnits(r), 0);
-  const totalRevenue = rows.reduce((s, r) => s + rowRevenue(r), 0);
-  const orderCount = rows.length;
-  const aov = orderCount ? totalRevenue / orderCount : 0;
+  const hasReturns = fileHasReturns(rows, mapping);
 
-  // Revenue trend from the date column, aggregated by month.
+  const byState = new Map<string, number>();
+  const byChannel = new Map<string, number>();
+  const byPayment = new Map<string, number>();
+  const byReturnProduct = new Map<string, number>();
+  const addTo = (m: Map<string, number>, key: unknown, v: number) => {
+    const k = String(key ?? "").trim() || "Unspecified";
+    m.set(k, (m.get(k) ?? 0) + v);
+  };
+
+  let grossRevenue = 0, grossUnits = 0, returnsValue = 0, returnsUnits = 0, orderCount = 0;
+  for (const r of rows) {
+    const rev = Math.abs(rowRevenue(r));
+    const units = Math.abs(rowUnits(r));
+    if (isReturnRow(r, mapping)) {
+      returnsValue += rev;
+      returnsUnits += units;
+      if (mapping.product) addTo(byReturnProduct, r[mapping.product as string], rev);
+      continue;
+    }
+    grossRevenue += rev;
+    grossUnits += units;
+    orderCount++;
+    // Dimensional breakdowns use gross sales only — returns typically don't carry
+    // the state/channel/payment fields, so netting them in creates negative bars.
+    if (mapping.state) addTo(byState, r[mapping.state as string], rev);
+    if (mapping.channel) addTo(byChannel, r[mapping.channel as string], rev);
+    if (mapping.payment) addTo(byPayment, r[mapping.payment as string], rev);
+  }
+  const totalRevenue = grossRevenue; // gross sales (returns surfaced separately)
+  const totalUnits = grossUnits;
+  const aov = orderCount ? grossRevenue / orderCount : 0; // avg value of a placed order
+
+  // Charts show known dimensions only: drop the blank "Unspecified" bucket.
+  const topBreakdown = (m: Map<string, number>, n: number): Breakdown[] =>
+    [...m.entries()]
+      .filter(([name, value]) => name !== "Unspecified" && value > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, n)
+      .map(([name, value]) => ({ name, value: Math.round(value) }));
+  const geoBreakdown = mapping.state ? topBreakdown(byState, 8) : [];
+  const channelBreakdown = mapping.channel ? topBreakdown(byChannel, 8) : [];
+  const paymentBreakdown = mapping.payment ? topBreakdown(byPayment, 6) : [];
+  const returns: ReturnsSummary | null = hasReturns
+    ? {
+        ratePct: grossRevenue > 0 ? Math.round((returnsValue / grossRevenue) * 1000) / 10 : 0,
+        value: Math.round(returnsValue),
+        units: Math.round(returnsUnits),
+        byProduct: topBreakdown(byReturnProduct, 6),
+      }
+    : null;
+
+  // Revenue trend from the date column, aggregated by month (net of returns).
   let revenueTrend: { day: string; revenue: number }[] = [];
   if (hasDate) {
     const byMonth = new Map<string, number>();
     for (const r of rows) {
+      if (isReturnRow(r, mapping)) continue; // gross sales trend
       const k = monthKey(r[mapping.date as string]);
       if (!k) continue;
-      byMonth.set(k, (byMonth.get(k) ?? 0) + (hasRevenue ? rowRevenue(r) : rowUnits(r)));
+      byMonth.set(k, (byMonth.get(k) ?? 0) + (hasRevenue ? Math.abs(rowRevenue(r)) : Math.abs(rowUnits(r))));
     }
     revenueTrend = [...byMonth.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
@@ -270,7 +368,7 @@ export function computeDashboard(
     icon: "revenue",
     label: "Revenue",
     value: hasRevenue ? money(currency, totalRevenue) : "—",
-    sub: hasRevenue ? "total in your data" : "add a sales or price column",
+    sub: hasRevenue ? (returns ? `before ${money(currency, returns.value)} returned` : "total in your data") : "add a sales or price column",
     tone: "default",
   };
   const unitsCard: KpiCard = {
@@ -361,7 +459,24 @@ export function computeDashboard(
         action: up ? "Keep the momentum going" : "Look into the recent dip",
       });
     }
-    if (topSkus[0]) {
+    // Third insight: returns (if notable) → top region → top SKU.
+    if (returns && returns.ratePct > 0) {
+      insights.push({
+        tone: returns.ratePct >= 10 ? "warn" : "good",
+        title: `Return rate is ${returns.ratePct}%`,
+        detail: returns.byProduct[0]
+          ? `${returns.byProduct[0].name} is the most returned by value (${money(currency, returns.byProduct[0].value)}).`
+          : `${money(currency, returns.value)} returned across ${returns.units.toLocaleString()} units.`,
+        action: returns.ratePct >= 10 ? "Review the top returned products" : "Return level looks healthy",
+      });
+    } else if (geoBreakdown[0]) {
+      insights.push({
+        tone: "good",
+        title: `${geoBreakdown[0].name} is your top region`,
+        detail: `${money(currency, geoBreakdown[0].value)} in net revenue.`,
+        action: "Double down on your strongest markets",
+      });
+    } else if (topSkus[0]) {
       insights.push({
         tone: "good",
         title: `${topSkus[0].sku} leads your coded SKUs`,
@@ -383,5 +498,9 @@ export function computeDashboard(
     stockoutRisks,
     slowMovers,
     revenueTrend,
+    geoBreakdown,
+    channelBreakdown,
+    paymentBreakdown,
+    returns,
   };
 }
