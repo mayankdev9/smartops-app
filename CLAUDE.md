@@ -184,9 +184,14 @@ Key points:
     - inventory → KPI cards Revenue / Units / **Capital in Stock / Stockout Risk**;
       Reorder + Slow-mover panels shown.
     - sales (no stock) → KPI cards Revenue / Units / **Orders / Avg Order Value**;
-      Reorder + Slow-mover panels **hidden**; business-health judged by the trend.
-  Verified on the real file: Revenue ₹64.08 Cr, 589,398 units, 588,228 orders,
-  12-month trend Apr 2025→Mar 2026.
+      Reorder + Slow-mover panels **hidden**; business-health judged by the trend;
+      plus **Revenue-by-state / channel / payment** bars and a **Returns** card.
+  **Returns-aware:** a voucher-type column (Credit Note) or negative amounts mark
+  returns; Revenue is **gross sales** (matches the backend) with returns reported
+  separately (rate/value/units). Dimensional breakdowns use gross sales rows only
+  (returns usually lack state/channel/payment), and the blank "Unspecified" bucket
+  is dropped from charts. Verified on the real file: Revenue ₹52.4 Cr gross,
+  returns 22.3% (₹11.7 Cr), 12-month trend Apr 2025→Mar 2026.
 - **Small persistence.** The store keeps the *computed* `DashboardData` (aggregates
   + top-N lists), not raw rows — safe for localStorage, survives refresh.
 - **Robust to any schema.** Auto-mapping guesses columns by name; the user can
@@ -465,6 +470,7 @@ Still open:
 
 ## Session log
 
+| Jul 16, 2026 | **Geography / channel / payment / returns analytics** (commit `0314c7c`, live): richer sales-file analytics. `mapping.ts` detects state/channel/payment/voucher-type columns; `analytics.ts` identifies returns (Credit Note voucher type or negative amounts), reports them separately, and makes the Revenue KPI **gross sales** (₹52.4Cr — matches the backend's ₹524M) with a "before ₹X returned" sub; adds `geoBreakdown`/`channelBreakdown`/`paymentBreakdown` (gross, blank buckets dropped) + a returns summary (rate/value/units/top returned SKUs). Dashboard gains Revenue-by-state/channel/payment bars + a Returns card for sales files; the Assistant's `fallbackChart` now covers geography/channel/payment/returns; `buildBusinessContext` forwards them. Verified on the real 588k-row file (returns 22.3% ₹11.7Cr; states Maharashtra/Karnataka/Delhi; channels Shopify/Myntra; payment Prepaid/COD) and in-browser (all panels + assistant geo chart render, no console errors). Note: this file's Credit Notes carry blank SKU/payment, so returns-by-product is empty and the Returns card says so. |
 | Jul 16, 2026 | **Assistant charts on uploaded data** (commit `1d49bad`, live): the backend charts its static-data answers but the uploaded-data path (`toolUsed=uploaded_business_context`) returns `chart:null`, so post-upload answers had no graph. Added a client-side fallback in `app/assistant/page.tsx` (`fallbackChart()`): when there's no backend chart and we're on uploaded (non-sample) data, draw a ChartSpec from the Dashboard's computed data (revenue-trend line or top-SKU bar) based on the question; geography/returns/payment/channel questions get no chart (we don't compute that on upload) so nothing misleading shows. Verified live that `AssistantChart` renders backend charts (the "Revenue by SKU Code" bar on sample data). |
 | Jul 16, 2026 | **Chat small-talk fix** (commit `24a4729`, live): "Hi" got no response because greetings were sent through the operational pipeline. Added `lib/smalltalk.ts` + a fast-path in the `/api/assistant` route (before proxy + mock) that instantly answers greetings/thanks/good-byes/"what can you do". Verified in-browser (instant greeting, real questions unaffected). |
 | Jul 16, 2026 | **Sales-data dashboard fix** (built + verified, pending commit): the Dashboard broke on the multi-channel sales log (`Customer Data.xlsx`) — Revenue "—", only 4.7k of 589k units, no trend. Reworked `computeDashboard` + mapping + parser to support **inventory OR sales files** in one path: all-row totals, amount-column revenue, monthly trend from a date column, adaptive KPI cards (Orders/AOV vs Capital/Stockout), `hasInventory` flag hides inventory-only panels, compact-currency chart axes. Verified on the real 588k-row file (₹64.08 Cr / 589,398 units / 588,228 orders / 12-mo trend) and confirmed the sample inventory dashboard is unchanged. Details in the STATUS block. |
