@@ -432,7 +432,7 @@ All structural/UX + Alerts + support + onboarding-loop + assistant-uploaded-data
 - Everything committed, deployed, docs synced. Nothing half-done. **Multi-tenant company accounts + shared data DONE** (commit `c706322`) — Mayank will test it.
 - **On resume:** get Mayank's feedback on the multi-tenant flow first; then likely richer per-upload analytics (geo/channels/returns for uploaded files), or productionizing multi-tenant (real backend+DB for cross-device sharing + real auth).
 - **Demo login:** admin / demo. A dev server may be left running on :3000 from this session.
-- Open housekeeping (unchanged): **rotate API keys** (screenshot-exposed), **brief Ahmer** on backend changes, **retire `smartops-app-five`**.
+- Open housekeeping: **rotate API keys** (screenshot-exposed), **brief Ahmer** on backend changes. (Retiring `smartops-app-five` — deferred until after the course, see below.)
 
 ### How the backend got connected (Jul 15)
 Ahmer decoupled his pipeline into a standalone **FastAPI** repo (`github.com/ahmer64-sketch/smartops-backend`, `POST /assistant`) that matches our contract exactly. Steps taken:
@@ -449,7 +449,7 @@ Ahmer decoupled his pipeline into a standalone **FastAPI** repo (`github.com/ahm
 ### ⚠️ TODO / follow-ups
 - **🔑 ROTATE THE API KEYS** (still open) — both keys were shown in a Render screenshot during setup. Regenerate Anthropic (console.anthropic.com) + OpenAI (platform.openai.com), update the two values in Render → Environment.
 - **Brief Ahmer on backend changes** (still open) — Critic fix (what he asked for) + length-cap removal + template relaxation, all in the fork + live on Render. Draft WhatsApp message was prepared; his call if he wants lengths tuned differently.
-- **Retire `smartops-app-five.vercel.app`** (Ahmer's old separate deploy) — everyone uses `smartops-agent` now.
+- ~~Retire `smartops-app-five.vercel.app`~~ — **deferred** (Jul 17). Ownership unclear (may be Mayank's own Vercel account or Ahmer's), and it isn't hindering current work or the live `smartops-agent` deploy. Mayank's call: leave it alone, revisit after the course ends.
 - **Done Jul 15 (front-end):** feedback batch 1 (landing/flow), batch 2 (interactive dashboard + business health), batch 4 (repositioning to "AI General Manager"), tuned suggested prompts to the live backend.
 - **Done Jul 15 (backend, in fork):** Critic re-validation fix (badge works), length caps removed, format template relaxed — all verified live end-to-end.
 - **Still to do:** feedback **batch 3** — Alerts page (colorful redesign + critical/normal prioritization + "Generate PO") — and a **Help/FAQ** support surface.
