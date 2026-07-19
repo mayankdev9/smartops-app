@@ -14,6 +14,35 @@
 
 ---
 
+## ▶▶▶ RESUME HERE (Jul 17 evening — plan approved, ZERO code written yet)
+
+**What happened:** the professor gave three pieces of feedback. A full architecture plan was researched, scoped, and **approved** in Claude Code's plan mode, but implementation was paused before any file was touched (Mayank wants to resume "this evening"). The complete approved plan — with exact schema, file lists, code-level design (including a verified-against-the-real-source merge algorithm), env vars, and verification steps for all 4 phases — is saved at:
+
+**`/Users/mayankdev/.claude/plans/linked-rolling-hamming.md`**
+
+Read that file in full before resuming — this section is only a summary/index into it.
+
+### The 3 professor feedback points → what was decided
+1. **"Strict user login structure"** → real backend auth (hashed passwords, real DB, real sessions) — not a cosmetic tightening. Login model: **Company Code + User ID + Password** (3 fields), deliberately chosen over QuickBooks-style global-account+email-invite (explained to Mayank why QBO doesn't actually work that way — it's global Intuit login + email invites + company picker — and why company-code login is the better fit here: zero email infra needed, maps directly onto the existing "admin manually adds users" pattern). Mayank floated a literal downloadable app (PWA/Electron/native) for the "first download" idea — walked through the real cost tiers (PWA=hours, Electron=a project of its own, native=highest cost/App Store review) and he chose to **skip app packaging entirely** for now, focus on what the professor actually asked for.
+2. **Tutorial video** → Mayank chose an **interactive in-app guided tour** (tooltips highlighting the UI in sequence) over a real recorded video, since Claude can't record/narrate video — a tour solves the same navigation problem without depending on him recording anything. Library: `react-joyride`.
+3. **Folder upload** → support selecting multiple files or a whole folder; classify each by **filename hint first, column-detection as fallback** (both, per Mayank); merge scope is the **full ambitious version** — not just same-type concatenation, but combining *different-shaped* files (e.g. a separate sales file + a separate inventory file) into **one richer dashboard** showing both revenue trends and stockout risk together.
+4. **Bonus scope Mayank added:** since login is going real, the "shared company data warehouse" (`lib/store.ts`, currently `localStorage`-only despite being called "shared") also moves to the real database in this pass, so it's genuinely cross-device.
+
+### The 4-phase plan (full detail in the plan file above)
+1. **Phase 1 — Interactive tour** (`react-joyride`). Independent of everything else, no external accounts needed — **do this one first**, quick win.
+2. **Phase 2 — Real auth + DB foundation.** Stack: **Auth.js (NextAuth v5) + Neon Postgres + Drizzle ORM**, `bcryptjs` for hashing, JWT sessions (removes `AuthGate.tsx`'s hydration-guard flash-of-unauthenticated-content problem as a side benefit). Needs Mayank to do 2 manual account-creation steps himself (Claude can't do these): (a) Vercel dashboard → Storage tab → connect a Neon Postgres DB (or neon.tech directly, free tier), copy `DATABASE_URL`; (b) run `npx auth secret`, paste `AUTH_SECRET` into `.env.local` **and** Vercel's Production+Preview env vars.
+3. **Phase 3 — Server-side data warehouse.** New `dashboards` table; `lib/store.ts` moves from localStorage to server actions / a small API route. Upload/parse/compute pipeline itself is unchanged (still Worker-based).
+4. **Phase 4 — Multi-file/folder upload + merge.** The interesting technical finding (verified against the real `lib/analytics.ts` source, not guessed): `toItems()` already uses `Math.max()` for stock/price/cost and `+=` for units/revenue, so **normalizing every file's rows to a canonical shape, concatenating, and calling `computeDashboard()` once** correctly merges sales-shaped + inventory-shaped data with **no changes needed to the core analytics engine** — the real work is in upload orchestration (per-file mapping UI, a new `{type:"normalize"}` message on the existing upload Worker, a union `Mapping` built from whichever fields were actually mapped across all files) plus **one real bug found and fixed as part of this**: the product-name join key is case-sensitive with no normalization today — two files spelling the same SKU differently would silently fail to merge; fix is `.trim().toUpperCase()` on the join key in `toItems`.
+
+### Explicitly descoped (Mayank's calls, don't re-litigate on resume)
+- No downloadable app (PWA/Electron/native) — not what the professor asked for.
+- No email-invite login flow — company-code login instead.
+
+### Next action on resume
+Nothing has been built yet. Start with **Phase 1 (the tour)** — it's fully self-contained, needs no external setup, and is the fastest way to have something real to show. A task was created in this session's task tracker (`Phase 1: Interactive product tour (react-joyride)`) but task-tracker state may not carry over to a fresh session — treat this CLAUDE.md section + the plan file as the source of truth, not the task tracker.
+
+---
+
 ## What this is
 
 The front-end for Team 5's **SmartOps** — a plain-English AI assistant for SMB
