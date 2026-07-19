@@ -432,7 +432,7 @@ All structural/UX + Alerts + support + onboarding-loop + assistant-uploaded-data
 - Everything committed, deployed, docs synced. Nothing half-done. **Multi-tenant company accounts + shared data DONE** (commit `c706322`) — Mayank will test it.
 - **On resume:** get Mayank's feedback on the multi-tenant flow first; then likely richer per-upload analytics (geo/channels/returns for uploaded files), or productionizing multi-tenant (real backend+DB for cross-device sharing + real auth).
 - **Demo login:** admin / demo. A dev server may be left running on :3000 from this session.
-- Open housekeeping: **rotate API keys** (screenshot-exposed), **brief Ahmer** on backend changes. (Retiring `smartops-app-five` — deferred until after the course, see below.)
+- **Housekeeping — all resolved (Jul 17):** API key rotation not a concern (Mayank confirmed). Briefing Ahmer — not needed; he's already aware and has given Mayank the lead on all product changes going forward. Retiring `smartops-app-five` — deferred until after the course.
 
 ### How the backend got connected (Jul 15)
 Ahmer decoupled his pipeline into a standalone **FastAPI** repo (`github.com/ahmer64-sketch/smartops-backend`, `POST /assistant`) that matches our contract exactly. Steps taken:
