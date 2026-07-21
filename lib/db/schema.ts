@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
-import { pgTable, uuid, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, uniqueIndex, jsonb } from "drizzle-orm/pg-core";
+import type { DashboardData } from "../analytics";
 
 export const companies = pgTable("companies", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -30,5 +31,20 @@ export const users = pgTable(
   ],
 );
 
+// One row per company — the shared data warehouse. Only the *computed*
+// DashboardData (aggregates/top-N lists) is stored here, never raw uploaded
+// rows, so this stays small regardless of how big the source file was.
+export const dashboards = pgTable("dashboards", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: uuid("company_id")
+    .notNull()
+    .unique()
+    .references(() => companies.id, { onDelete: "cascade" }),
+  data: jsonb("data").$type<DashboardData>().notNull(),
+  uploadedBy: text("uploaded_by").notNull(),
+  uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type Company = typeof companies.$inferSelect;
 export type User = typeof users.$inferSelect;
+export type Dashboard = typeof dashboards.$inferSelect;

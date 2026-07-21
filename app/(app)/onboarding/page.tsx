@@ -79,7 +79,7 @@ export default function OnboardingPage() {
       setComputing(true);
       try {
         const data = await sessionRef.current.compute(mapping, currency, fileName);
-        if (me) setData(me.companyId, data, me.name ?? "a teammate");
+        if (me) await setData(me.companyId, data, me.name ?? "a teammate");
       } catch (err) {
         setParseError(err instanceof Error ? err.message : "Could not process your data.");
         setComputing(false);

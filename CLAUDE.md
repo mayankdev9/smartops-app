@@ -6,7 +6,7 @@
 **Location:** `~/Documents/Claude/Applied Product Management/smartops-app/`
 **Repo:** https://github.com/mayankdev9/smartops-app (public, `main` branch)
 **Live:** https://smartops-agent.vercel.app (Vercel; auto-deploys on push to `main`; legacy alias `smartops-app-six.vercel.app` also resolves)
-**Status:** ✅ MVP complete & DEPLOYED (Jul 11, 2026) — all 5 screens + live API verified in production
+**Status:** ✅ MVP complete & DEPLOYED (Jul 11, 2026) — all 5 screens + live API verified in production. ✅ **Real backend auth (Phase 2) LIVE (Jul 21, 2026).** ✅ **Server-side shared data warehouse (Phase 3) built + locally verified (Jul 21, 2026), pushing to production next.**
 
 > This file is the source-of-truth for the SmartOps front-end. The course-level
 > status pointer lives in `../CLAUDE.md` (SmartOps section). Product/positioning
@@ -14,21 +14,42 @@
 
 ---
 
-## ▶▶▶ RESUME HERE (Jul 21 — Phase 2 code complete, blocked on Mayank's 2 manual steps)
+## ▶▶▶ RESUME HERE (Jul 21 — Phases 2+3 built. Mayank now doing company/user/data setup)
 
 **Why Phase 2 got pulled forward:** teammates (Abdulrahman etc.) tried logging into the accounts Mayank created for them and got "Wrong user ID or password." Root cause: the old `lib/authStore.ts` was zustand+`localStorage` — accounts created in Mayank's browser only ever existed in Mayank's browser, never reached anyone else's device. This is exactly what Phase 2 (real backend auth) fixes, so Mayank asked to do Phase 2 first, before Phase 1 (tour). He also re-raised a QuickBooks-style login model; re-confirmed the earlier decision (Company Code + User ID + Password, no email infra) since QBO's real model is global-Intuit-login + email invites, a much bigger lift than what the professor asked for.
 
-**Status: DONE and fully verified end-to-end (Jul 21). Not yet pushed to `main` — that's the next action.** Mayank connected Neon via Vercel's Storage tab (project `neon-cyan-leaf`, `DATABASE_URL`/`DATABASE_URL_UNPOOLED` confirmed in Vercel env vars, Production+Preview) and added `AUTH_SECRET` to both `.env.local` and Vercel. `npm run db:generate` + `npm run db:migrate` created the `companies`/`users` tables on the real DB (note: had to add `dotenv` as a dev dep + load `.env.local` explicitly in `drizzle.config.ts` — `drizzle-kit` doesn't get Next.js's automatic env loading).
+**New driver for the demo (Jul 21):** the professor wants to see **more customers**. Plan: obtain and upload real data from **three different businesses** — a clothing company (customer data), a salon (sales data), and a dessert manufacturer (sales + inventory data) — each set up as its own company in the app with its own users, to show multi-tenant usage isn't just theoretical. Confirmed the Neon free tier (0.5GB storage) is comfortably enough.
 
-**Verified live against the real Neon DB (not just build/typecheck):**
-- Signup → real `INSERT` into `companies`+`users`, generated company code shown (e.g. `VERI-5SRL` format: name-prefix + random suffix) → auto-login → landed on Dashboard with real session (`Verify Test Co` / `Test Admin · Admin` in the sidebar, `Team` nav item present confirming admin-role gating reads the real session).
-- Logged out → correctly redirected to `/login`, no session leakage.
-- Wrong password → rejected with "Wrong company code, user ID, or password." (generic, doesn't leak which field was wrong).
-- Correct password → logged back in successfully — proves the full DB round trip (not a cached/local artifact).
-- Queried the `users` table directly: `password_hash` is a real bcrypt hash (`$2b$10$...`, 60 chars) — not plaintext.
-- Test company + user deleted afterward (`DELETE FROM companies WHERE company_code = 'VERI-5SRL'`, cascades to users) — the database is clean and empty, ready for the real 3-company demo (clothing/salon/dessert manufacturer).
+**Why Phase 3 got pulled forward too:** right after Phase 2 shipped, Mayank explicitly said he wants to stop treating this as a prototype — "when I share the link again with my teammates, they should see the data that has been uploaded for a company code." That's a real requirement, not a nice-to-have, so Phase 3 (server-side data warehouse) got built the same session instead of staying parked.
 
-**Not yet done:** `git push` to `main` (nothing pushed yet — nothing has touched the live `smartops-agent.vercel.app` site). Vercel auto-deploys on push, so the moment this lands on `main`, the real login screen goes live and the old `admin`/`demo` localStorage login stops existing. Recommend confirming with Mayank he's ready before pushing, since every teammate's current bookmarked login flow changes at that point — they'll need the company code from whichever company he creates the real demo companies under.
+### ✅ Phase 2 — SHIPPED AND LIVE (Jul 21, 2026)
+
+Walked Mayank through the Vercel/Neon dashboard step by step (screenshots each step) to connect the database and generate the auth secret, then built, tested, and deployed the whole thing in one session:
+
+1. **Neon Postgres connected** via Vercel's Storage tab (Vercel project `neon-cyan-leaf`) — `DATABASE_URL` confirmed present (unprefixed, matching the code) in Vercel env vars, scoped Production + Preview.
+2. **`AUTH_SECRET` generated and set** — note: `npx auth secret` resolved to an unrelated, unmaintained npm package that squats the `auth` name (prints `BETTER_AUTH_SECRET`, a different library entirely) — worked around by generating the secret directly via Node's `crypto.randomBytes(32).toString('base64')`, which is what that command would have done anyway. Set in both `.env.local` and Vercel (Production + Preview).
+3. **Migration run against the real DB** — `npm run db:generate` + `npm run db:migrate` created `companies`/`users` tables. Hit and fixed a real gap: `drizzle-kit` runs as a plain Node script and doesn't get Next.js's automatic `.env.local` loading — added `dotenv` as a dev dependency and load `.env.local` explicitly in `drizzle.config.ts`.
+4. **Full local E2E verification against the real Neon DB** (not mocked): signup → real `INSERT` into `companies`+`users`, company code generated (format `PREFIX-XXXX`) → auto-login → landed on Dashboard with a real session. Logged out → redirected to `/login` cleanly. Wrong password → rejected with a generic error. Correct password → logged back in, proving the full DB round trip. Queried `users` directly and confirmed `password_hash` is a real bcrypt hash (`$2b$10$...`, 60 chars), not plaintext. Test company deleted afterward so the DB is clean for Mayank's real data.
+5. **Committed and pushed to `main`** (commit `0d9feb8`) — Vercel auto-deployed. **Confirmed live in production** (not just local): polled `https://smartops-agent.vercel.app/login` until the new page appeared (~30s build time), then verified via curl that unauthenticated `/dashboard` correctly 307-redirects to `/login`, and `POST /api/assistant` correctly returns 401 when signed out — both against the real Edge-deployed `proxy.ts`, not a local dev server.
+
+**⚠️ Consequence of going live:** the old `admin`/`demo` localStorage login **no longer exists**. Every teammate needs a real company code + user ID + password now. This is the fix for the original bug, but it means Paola/Abdulrahman/Ahmer's old bookmarked access is gone until Mayank re-adds them under a real company.
+
+### ✅ Phase 3 — server-side shared data warehouse — built and locally verified (Jul 21, 2026), not yet pushed
+
+**What changed:** `lib/store.ts` (the uploaded-dashboard-data store) moved from zustand+`localStorage` to Postgres, mirroring exactly what Phase 2 did for auth. New `dashboards` table (`company_id` unique + FK cascade, `data` jsonb — the *computed* `DashboardData`, never raw rows, so this stays small regardless of source file size — `uploaded_by`, `uploaded_at`). New `lib/actions/dashboard.ts` (`getDashboardDataAction`/`saveDashboardDataAction`/`clearDashboardDataAction`, all session-scoped server-side — a company's data can only be read/written by someone logged into that company). `lib/store.ts` keeps its exact same exported API (`useDataStore`, `useDashboardData()`, `useCompanyDataMeta()`) so no consumer file needed rewriting beyond one `await` in `onboarding/page.tsx`'s `finish()` — the zustand store is now just an in-memory-per-tab cache populated by fetching from Postgres on first use (via `ensureLoaded`), not a persisted store. Migration `drizzle/0001_amusing_scrambler.sql` applied to the real DB — additive only (`CREATE TABLE`), zero risk to existing `companies`/`users` rows.
+
+**Verified locally against the real Neon DB (not mocked), simulating a genuine cross-user scenario:**
+1. Created a test company + 2 users (admin + member) via the real signup/Team flow.
+2. Inserted a dashboard row **directly via SQL** (simulating what an upload would produce, since the upload/parse pipeline itself is unchanged and was already verified extensively in earlier sessions — this test targets only the new persistence layer).
+3. Logged in as the **admin** on a fresh page load (zero prior client-side state) → dashboard correctly showed "Showing your data: Test Upload — Verify Phase 3.csv" pulled straight from Postgres.
+4. Logged out, logged back in as the **member** user (different login, same "fresh state" conditions as a different device) → saw the **exact same uploaded data**, with zero re-upload. This is the literal requirement Mayank asked for.
+5. Confirmed role-based nav still correct: the member user's sidebar has no "Team" link (admin-only), same as Phase 2.
+6. Clicked "Reset to sample" → dashboard reverted. Hard-reloaded the page → still reverted (not just an optimistic local change) — confirms the delete hit the database, not just client state.
+7. Deleted the test company (cascades to its users **and** its dashboard row) — DB confirmed clean (`0` companies, `0` dashboards) before Mayank starts his real data.
+
+**Not yet done:** push to `main` (Vercel auto-deploys on push — same as Phase 2, will confirm live in production the same way via curl before calling it done). `npm run build` already green locally.
+
+**Still explicitly not done, not currently blocking:** Phase 1 (interactive tour), Phase 4 (folder upload/merge of different-shaped files). Full original plan at `~/.claude/plans/linked-rolling-hamming.md`.
 
 **What actually got built (Jul 21):**
 - **Stack exactly per the plan:** Auth.js v5 (NextAuth, Credentials provider) + Neon Postgres + Drizzle ORM + `bcryptjs`, JWT sessions.
@@ -572,6 +593,7 @@ Still open:
 
 | Date | Work |
 |---|---|
+| Jul 21, 2026 | **Phase 2 (real backend auth) built, verified, and shipped live** (commit `0d9feb8`). Auth.js v5 (Credentials provider) + Neon Postgres + Drizzle ORM + bcrypt, JWT sessions, Company Code + User ID + Password login. New: `lib/db/schema.ts`/`index.ts`, `auth.config.ts`/`auth.ts` (edge-safe/Node split), `proxy.ts` (renamed from `middleware.ts`, Next 16 convention), `lib/actions/auth.ts` (server actions, admin-role re-checked server-side), `app/(auth)/login`+`/signup`, `app/(app)/` route group wrapping the old pages. Deleted `lib/authStore.ts` + `components/AuthGate.tsx`. Caught and fixed a real build bug (lazy Neon client via `Proxy`, since `neon()` throws at import time if `DATABASE_URL` is unset and Next's build-time page-data collection imports every route). Walked Mayank through connecting Neon via Vercel's Storage tab and generating `AUTH_SECRET` (worked around an `npx auth secret` package-name collision with an unrelated "Better Auth" npm package). Ran the migration (`npm run db:generate`/`db:migrate`; added `dotenv` since `drizzle-kit` doesn't get Next's automatic env loading), then verified the full signup → auto-login → logout → wrong-password-rejected → correct-password-login flow against the real DB, confirmed `password_hash` is a genuine bcrypt hash, deleted the test company, pushed to `main`, and confirmed the new login is live in production via curl (unauthenticated `/dashboard` redirects, `/api/assistant` returns 401). **Old `admin`/`demo` login no longer exists.** New driver: professor wants to see more customers, so the plan is 3 real companies (clothing/salon/dessert manufacturer) each with their own users + data — confirmed Neon's free tier is more than enough. **Flagged before that demo:** `lib/store.ts` (uploaded dashboard data) is still localStorage-only, so data won't be visible across a teammate's different browser — Phase 3 should move up ahead of the demo. |
 | Jul 11, 2026 | Scaffolded app (Next.js 16, Claro stack); built mock `/api/assistant` + `lib/mock.ts`; shipped Chat/Assistant screen wired end-to-end; verified. |
 | Jul 11, 2026 | Completed MVP: Sidebar nav + shared shell, Dashboard (Recharts), Daily Alert (WhatsApp/email), Onboarding; centralized `lib/data.ts`; all routes 200, clean typecheck. |
 | Jul 11, 2026 | Verified production build (`npm run build` clean); `git init` + initial commit; pushed to new public GitHub repo `mayankdev9/smartops-app` (new classic PAT after old one expired Jul 4). Next: Vercel import. |
