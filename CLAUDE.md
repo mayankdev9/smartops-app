@@ -14,9 +14,36 @@
 
 ---
 
-## ▶▶▶ RESUME HERE (Jul 17 evening — plan approved, ZERO code written yet)
+## ▶▶▶ RESUME HERE (Jul 21 — Phase 2 code complete, blocked on Mayank's 2 manual steps)
 
-**What happened:** the professor gave three pieces of feedback. A full architecture plan was researched, scoped, and **approved** in Claude Code's plan mode, but implementation was paused before any file was touched (Mayank wants to resume "this evening"). The complete approved plan — with exact schema, file lists, code-level design (including a verified-against-the-real-source merge algorithm), env vars, and verification steps for all 4 phases — is saved at:
+**Why Phase 2 got pulled forward:** teammates (Abdulrahman etc.) tried logging into the accounts Mayank created for them and got "Wrong user ID or password." Root cause: the old `lib/authStore.ts` was zustand+`localStorage` — accounts created in Mayank's browser only ever existed in Mayank's browser, never reached anyone else's device. This is exactly what Phase 2 (real backend auth) fixes, so Mayank asked to do Phase 2 first, before Phase 1 (tour). He also re-raised a QuickBooks-style login model; re-confirmed the earlier decision (Company Code + User ID + Password, no email infra) since QBO's real model is global-Intuit-login + email invites, a much bigger lift than what the professor asked for.
+
+**Status: DONE and fully verified end-to-end (Jul 21). Not yet pushed to `main` — that's the next action.** Mayank connected Neon via Vercel's Storage tab (project `neon-cyan-leaf`, `DATABASE_URL`/`DATABASE_URL_UNPOOLED` confirmed in Vercel env vars, Production+Preview) and added `AUTH_SECRET` to both `.env.local` and Vercel. `npm run db:generate` + `npm run db:migrate` created the `companies`/`users` tables on the real DB (note: had to add `dotenv` as a dev dep + load `.env.local` explicitly in `drizzle.config.ts` — `drizzle-kit` doesn't get Next.js's automatic env loading).
+
+**Verified live against the real Neon DB (not just build/typecheck):**
+- Signup → real `INSERT` into `companies`+`users`, generated company code shown (e.g. `VERI-5SRL` format: name-prefix + random suffix) → auto-login → landed on Dashboard with real session (`Verify Test Co` / `Test Admin · Admin` in the sidebar, `Team` nav item present confirming admin-role gating reads the real session).
+- Logged out → correctly redirected to `/login`, no session leakage.
+- Wrong password → rejected with "Wrong company code, user ID, or password." (generic, doesn't leak which field was wrong).
+- Correct password → logged back in successfully — proves the full DB round trip (not a cached/local artifact).
+- Queried the `users` table directly: `password_hash` is a real bcrypt hash (`$2b$10$...`, 60 chars) — not plaintext.
+- Test company + user deleted afterward (`DELETE FROM companies WHERE company_code = 'VERI-5SRL'`, cascades to users) — the database is clean and empty, ready for the real 3-company demo (clothing/salon/dessert manufacturer).
+
+**Not yet done:** `git push` to `main` (nothing pushed yet — nothing has touched the live `smartops-agent.vercel.app` site). Vercel auto-deploys on push, so the moment this lands on `main`, the real login screen goes live and the old `admin`/`demo` localStorage login stops existing. Recommend confirming with Mayank he's ready before pushing, since every teammate's current bookmarked login flow changes at that point — they'll need the company code from whichever company he creates the real demo companies under.
+
+**What actually got built (Jul 21):**
+- **Stack exactly per the plan:** Auth.js v5 (NextAuth, Credentials provider) + Neon Postgres + Drizzle ORM + `bcryptjs`, JWT sessions.
+- `lib/db/schema.ts` — `companies` (with unique `company_code`) + `users` (bcrypt `password_hash`, unique per-company-lowercased `login_id`) tables.
+- `lib/db/index.ts` — **lazy** Neon client behind a `Proxy` (not instantiated at module load) — needed because `npm run build`'s page-data-collection phase imports every route module for static analysis, and `neon()` throws immediately if `DATABASE_URL` is unset at that point. This was caught by actually running `npm run build` before declaring done, not just `tsc`.
+- `auth.config.ts` (edge-safe, no providers) + `auth.ts` (adds the Credentials provider, Node-only) — split per NextAuth v5's own recommended pattern, so `proxy.ts` (renamed from `middleware.ts` — Next 16 deprecated the old file name) never bundles bcrypt/Drizzle into the Edge runtime. `authorized()` callback in `auth.config.ts` gates every route: redirects unauthenticated users to `/login`, redirects logged-in users away from `/login`+`/signup`, and blocks non-admins from `/team` (defense in depth — `/team`'s page component also re-checks).
+- `lib/actions/auth.ts` — server actions `createCompanyAction` (generates a unique `PREFIX-XXXX` company code, e.g. `CAVA-7F3K`), `addUserAction`, `removeUserAction`, `getCompanyUsersAction` — all bcrypt-hash server-side, admin-role re-checked server-side (not just trusted from the UI).
+- **Route groups added:** `app/(app)/` (dashboard, alerts, onboarding, assistant, help, team — wrapped in a layout with `<Sidebar/>`) and `app/(auth)/` (`login`, `signup` — plain centered card layout, no sidebar). URLs are unchanged (`/dashboard`, `/team`, etc.) — route groups don't affect the path.
+- **Deleted:** `lib/authStore.ts`, `components/AuthGate.tsx` (the whole client-side hydration-guard "flash of unauthenticated content" problem is gone — `proxy.ts` blocks the request before any page renders, no more `mounted` state trick).
+- **Swapped every call site** (`Sidebar.tsx`, `app/(app)/team/page.tsx`, `app/(app)/onboarding/page.tsx`, `app/(app)/dashboard/page.tsx`, `lib/store.ts`) from the old zustand `useCurrentUser()`/`useCurrentCompany()` to `useSession()` (`next-auth/react`). `lib/store.ts`'s company-scoped data warehouse still reads `session.user.companyId` — same scoping logic, just backed by a real login now instead of localStorage.
+- **`/api/assistant` now requires a session** (401 JSON if not signed in) — verified live via curl. This check needs zero DB access (JWT-only), so it works even before Neon is connected.
+- **New pages:** `/login` (3-field: company code, user ID, password) and `/signup` (create company → shows the generated company code with a copy button + "save this" messaging → then signs in).
+- Verified in the browser (dev + prod build): `/login` and `/signup` render correctly, no console errors; hitting `/` or `/dashboard` while logged out correctly 307-redirects to `/login?callbackUrl=...`; `POST /api/assistant` unauthenticated returns 401. **Not yet tested:** the actual DB-backed login/signup round trip (blocked on `DATABASE_URL`).
+
+**Old plan context below (Phases 3–4 still not started) — the complete approved plan — with exact schema, file lists, code-level design (including a verified-against-the-real-source merge algorithm), env vars, and verification steps for all 4 phases — is saved at:
 
 **`/Users/mayankdev/.claude/plans/linked-rolling-hamming.md`**
 
@@ -568,4 +595,4 @@ Still open:
 
 ---
 
-*Last updated: 2026-07-17*
+*Last updated: 2026-07-21*

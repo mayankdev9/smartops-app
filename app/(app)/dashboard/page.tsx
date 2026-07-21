@@ -18,8 +18,8 @@ import {
 import { Activity, AlertTriangle, ArrowRight, ChevronRight, Database, FileSpreadsheet, FileText, Package, RefreshCw, Snowflake, Sparkles, TrendingUp, Upload } from "lucide-react";
 import type { Insight } from "@/lib/data";
 import { businessHealth, type KpiCard as KpiCardData } from "@/lib/analytics";
+import { useSession } from "next-auth/react";
 import { useDashboardData, useDataStore } from "@/lib/store";
-import { useCurrentCompany } from "@/lib/authStore";
 import { exportExcel, exportPdf } from "@/lib/export";
 import SkuDrawer, { type SkuDetail } from "@/components/SkuDrawer";
 
@@ -119,8 +119,9 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 export default function DashboardPage() {
   const d = useDashboardData();
   const clearData = useDataStore((s) => s.clear);
-  const company = useCurrentCompany();
-  const clear = () => company && clearData(company.id);
+  const { data: session } = useSession();
+  const companyId = session?.user?.companyId;
+  const clear = () => companyId && clearData(companyId);
   const [selectedSku, setSelectedSku] = useState<SkuDetail | null>(null);
   const health = businessHealth(d);
   const hs = HEALTH_STYLES[health.tone];

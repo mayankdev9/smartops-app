@@ -2,9 +2,9 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { useSession } from "next-auth/react";
 import { normalizeDashboard, type DashboardData } from "./analytics";
 import { sampleDashboard } from "./data";
-import { useAuthStore } from "./authStore";
 
 // Data is scoped BY COMPANY — this is the "shared data warehouse": whichever user
 // in a company uploads a file, every user in that company sees it. Keyed by
@@ -53,14 +53,16 @@ export const useDataStore = create<DataState>()(
 
 /** The current company's uploaded dashboard, or the built-in sample if none. */
 export function useDashboardData(): DashboardData {
-  const companyId = useAuthStore((s) => s.session?.companyId);
+  const { data: session } = useSession();
+  const companyId = session?.user?.companyId;
   const rec = useDataStore((s) => (companyId ? s.records[companyId] : undefined));
   return rec?.data ?? sampleDashboard;
 }
 
 /** Metadata about the current company's uploaded data (who/when), or null. */
 export function useCompanyDataMeta(): { uploadedBy: string; uploadedAt: number } | null {
-  const companyId = useAuthStore((s) => s.session?.companyId);
+  const { data: session } = useSession();
+  const companyId = session?.user?.companyId;
   const rec = useDataStore((s) => (companyId ? s.records[companyId] : undefined));
   return rec ? { uploadedBy: rec.uploadedBy, uploadedAt: rec.uploadedAt } : null;
 }

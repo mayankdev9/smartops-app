@@ -6,8 +6,8 @@ import { Activity, AlertCircle, ArrowRight, Check, FileSpreadsheet, Loader2, Mes
 import { autoDetectMapping, FIELDS, isMappingValid, type Mapping } from "@/lib/mapping";
 import { businessHealth } from "@/lib/analytics";
 import { UploadSession, type ParsedMeta } from "@/lib/uploadSession";
+import { useSession } from "next-auth/react";
 import { useDashboardData, useDataStore } from "@/lib/store";
-import { useCurrentCompany, useCurrentUser } from "@/lib/authStore";
 
 const STEPS = ["Business", "Connect data", "Diagnosis"];
 const CURRENCIES = ["₹", "$", "€", "£"];
@@ -28,8 +28,8 @@ const HEALTH_STYLES = {
 export default function OnboardingPage() {
   const router = useRouter();
   const setData = useDataStore((s) => s.setData);
-  const currentCompany = useCurrentCompany();
-  const currentUser = useCurrentUser();
+  const { data: session } = useSession();
+  const me = session?.user;
   const [step, setStep] = useState(0);
   const [connected, setConnected] = useState(false);
   const [parsed, setParsed] = useState<ParsedMeta | null>(null);
@@ -79,7 +79,7 @@ export default function OnboardingPage() {
       setComputing(true);
       try {
         const data = await sessionRef.current.compute(mapping, currency, fileName);
-        if (currentCompany) setData(currentCompany.id, data, currentUser?.name ?? "a teammate");
+        if (me) setData(me.companyId, data, me.name ?? "a teammate");
       } catch (err) {
         setParseError(err instanceof Error ? err.message : "Could not process your data.");
         setComputing(false);
@@ -131,16 +131,16 @@ export default function OnboardingPage() {
           {step === 0 && (
             <div className="space-y-4">
               <h3 className="text-lg font-bold text-slate-900">Set up your data</h3>
-              {currentCompany && (
+              {me && (
                 <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-sm font-bold text-brand">
-                    {currentCompany.name.charAt(0).toUpperCase()}
+                    {me.companyName.charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-900">{currentCompany.name}</p>
+                    <p className="truncate text-sm font-semibold text-slate-900">{me.companyName}</p>
                     <p className="truncate text-xs text-slate-500">
-                      {currentCompany.type}
-                      {currentUser ? ` · ${currentUser.name}` : ""}
+                      {me.companyType}
+                      {me.name ? ` · ${me.name}` : ""}
                     </p>
                   </div>
                   <span className="ml-auto shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
@@ -358,7 +358,7 @@ export default function OnboardingPage() {
                   <Activity size={22} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900">Here&apos;s what SmartOps found{currentCompany ? `, ${currentCompany.name}` : ""}</h3>
+                  <h3 className="text-lg font-bold text-slate-900">Here&apos;s what SmartOps found{me ? `, ${me.companyName}` : ""}</h3>
                   <p className="text-sm text-slate-500">
                     {d.isSample
                       ? "Based on sample data — upload your file for a read on your own numbers."

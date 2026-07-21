@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { getMockResponse } from "@/lib/mock";
 import { getSmallTalk } from "@/lib/smalltalk";
 
@@ -37,6 +38,11 @@ interface AssistantResponse {
 }
 
 export async function POST(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  }
+
   const { message, history = [], businessContext = {} } = (await req.json()) as {
     message: string;
     history?: Msg[];
