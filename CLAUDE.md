@@ -47,7 +47,9 @@ Walked Mayank through the Vercel/Neon dashboard step by step (screenshots each s
 6. Clicked "Reset to sample" → dashboard reverted. Hard-reloaded the page → still reverted (not just an optimistic local change) — confirms the delete hit the database, not just client state.
 7. Deleted the test company (cascades to its users **and** its dashboard row) — DB confirmed clean (`0` companies, `0` dashboards) before Mayank starts his real data.
 
-**Not yet done:** push to `main` (Vercel auto-deploys on push — same as Phase 2, will confirm live in production the same way via curl before calling it done). `npm run build` already green locally.
+**✅ Pushed and confirmed live (commit `387c092`).** Vercel auto-deployed. Verified against **production**, not just local: created a real test company on the live site, seeded a dashboard row directly in the (single, shared) production Neon DB, logged in fresh — the live Dashboard immediately showed "Showing your data: Production Verify — Phase3.csv" pulled from Postgres, zero console errors. Test company deleted afterward — production DB confirmed clean (0 companies, 0 dashboards) before Mayank starts his real data.
+
+**Both Phase 2 and Phase 3 are now live.** The app is no longer a prototype for auth or for shared data — a company's data genuinely follows the company code across any device/browser now, matching what Mayank asked for.
 
 **Still explicitly not done, not currently blocking:** Phase 1 (interactive tour), Phase 4 (folder upload/merge of different-shaped files). Full original plan at `~/.claude/plans/linked-rolling-hamming.md`.
 
