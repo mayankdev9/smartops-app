@@ -6,7 +6,7 @@
 **Location:** `~/Documents/Claude/Applied Product Management/smartops-app/`
 **Repo:** https://github.com/mayankdev9/smartops-app (public, `main` branch)
 **Live:** https://smartops-agent.vercel.app (Vercel; auto-deploys on push to `main`; legacy alias `smartops-app-six.vercel.app` also resolves)
-**Status:** ✅ MVP complete & DEPLOYED (Jul 11, 2026) — all 5 screens + live API verified in production. ✅ **Real backend auth (Phase 2) LIVE.** ✅ **Server-side shared data warehouse (Phase 3) LIVE.** ✅ **Multi-file/folder upload + merge (Phase 4) built + verified (Jul 21, 2026), pushing to production next.**
+**Status:** ✅ MVP complete & DEPLOYED (Jul 11, 2026) — all 5 screens + live API verified in production. ✅ **Real backend auth (Phase 2) LIVE.** ✅ **Server-side shared data warehouse (Phase 3) LIVE.** ✅ **Multi-file/folder upload + merge (Phase 4) LIVE.** ✅ **Interactive product tour (Phase 1) built + verified (Jul 21, 2026), pushing to production next.**
 
 > This file is the source-of-truth for the SmartOps front-end. The course-level
 > status pointer lives in `../CLAUDE.md` (SmartOps section). Product/positioning
@@ -63,7 +63,25 @@ Walked Mayank through the Vercel/Neon dashboard step by step (screenshots each s
 1. **Standalone Node script** (esbuild-bundled, run directly against the real `lib/analytics.ts`/`lib/mergeUpload.ts`): a synthetic sales file + inventory file sharing products with mismatched SKU casing (`sku001` vs `SKU001`) merged into one item correctly (53 combined units, exactly 3 distinct SKUs not 4); a same-shaped two-sales-files case (different months) concatenated correctly (30 total units, 2-month trend).
 2. **Real browser E2E** — since this browser automation tool can't drive a native file picker, injected real `File` objects into the actual `<input>` via `DataTransfer` + a dispatched `change` event (a legitimate way to exercise the real code path, not a shortcut around it). Uploaded a sales CSV (`widget-a`/`widget-b`, lowercase) + an inventory CSV (`WIDGET-A`/`WIDGET-B`/`WIDGET-C`, uppercase) through the **real Web Worker pipeline** (parse → normalize → combine), confirmed the Diagnosis screen showed `widget-a is your top seller — 53 units` (13 from sales + 40 from inventory, proving the case-fix works through the real UI, not just the isolated script) and `WIDGET-C is your slowest mover` (inventory-only SKU correctly included). Reloaded the page fresh afterward — combined data persisted (confirms it saved to Postgres via Phase 3's pipeline, not just client state). Test company deleted afterward.
 
-**Not yet done:** push to `main` (Vercel auto-deploys — same pattern as Phases 2 and 3, will confirm live in production the same way before calling it done). `npm run build` already green locally.
+**✅ Pushed and confirmed live (commit `71d77ad`).** Verified directly against production: logged into a real test company on the live site, uploaded the same sales+inventory CSVs through the real Edge-deployed worker bundle, confirmed the identical correct merge result (`widget-a — 53 units`) with zero console errors. Test company deleted afterward.
+
+### ✅ Phase 1 — interactive product tour — built and verified (Jul 21, 2026), not yet pushed
+
+**Why this got picked up now:** Mayank asked for "the click-through video" — clarified first (via a quick question) that he meant the interactive tour we'd already scoped, not an actual recorded video (which Claude can't produce — it would need Mayank to record and hand over a file).
+
+**What changed:** `react-joyride` (installed as `^3.2.0` — a major-version rewrite from the API the original plan was written against; had to read the actual shipped `.d.mts` type definitions rather than trust the plan's v2-era API sketch, since `Joyride` is now a named export not default, the callback prop is `onEvent` not `callback`, colors live in an `options` prop not `styles.options`, and there's no `disableBeacon` field on steps anymore). Two short tours, both gated to desktop viewports (`window.innerWidth >= 768` — mobile's hamburger-drawer nav and the dense mapping UI are out of scope for v1, matching the original plan's own stated simplification):
+- **Nav tour** (6 steps) — auto-runs once on a user's first Dashboard visit: the four main sidebar links, the Business Health hero, then either the "Upload data" CTA (sample data) or the "Showing your data" banner (already has real data) as the closing step.
+- **Upload tour** (2 steps) — auto-runs once the first time a user reaches Onboarding's "Connect data" step: "Select files" and "Select a folder".
+- **Manual replay**: a "Start tutorial" link in the Sidebar footer and in the Help page header, both navigating to `/dashboard?tour=1` — the Dashboard page reads that query param (via `window.location.search` in a `useEffect`, deliberately *not* `useSearchParams()`, to avoid a Suspense-boundary requirement for a plain client page) and force-runs the nav tour even if already seen, then strips the param via `router.replace` when it finishes.
+- `lib/tourStore.ts` — zustand `persist` store (`smartops-tour` key) with two independent seen-flags, matching the existing `smartops-<thing>` localStorage convention.
+- `components/ProductTour.tsx` — a thin, reusable wrapper so both tours share one styled component (brand blue `#1d4ed8`, rounded tooltip, dimmed overlay).
+- `data-tour="..."` attributes added to `Sidebar.tsx`'s nav links, the Dashboard's health hero + both data-source banner variants, and Onboarding's two upload dropzones.
+
+**Verified live in the browser (not just build-clean):** signed up a fresh test company, confirmed the nav tour auto-ran on first Dashboard load (all 6 steps, correct spotlighting, correct auto-scroll to bring the health hero into view since it's inside a scrollable container while the sidebar isn't), confirmed it does **not** re-run on a plain reload (persistence working), confirmed the Help page's "Start tutorial" button force-reruns it via the query param even after being marked seen, confirmed "Skip" also finishes cleanly and strips the URL param, then confirmed the separate upload tour auto-ran on first reaching Onboarding step 1 (both steps). Zero console errors throughout. Test company deleted afterward.
+
+**Known v1 cosmetic gap, not blocking:** the tooltip's automatic positioning occasionally overlaps adjacent UI slightly (e.g. the sidebar nav text, the "Skip — use sample data" button) rather than always sitting in fully clear space — functional and readable, just not pixel-perfect. Worth a polish pass later if it bothers Mayank in the actual demo.
+
+**Not yet done:** push to `main`. `npm run build` already green locally.
 
 **What actually got built (Jul 21):**
 - **Stack exactly per the plan:** Auth.js v5 (NextAuth, Credentials provider) + Neon Postgres + Drizzle ORM + `bcryptjs`, JWT sessions.
@@ -78,7 +96,7 @@ Walked Mayank through the Vercel/Neon dashboard step by step (screenshots each s
 - **New pages:** `/login` (3-field: company code, user ID, password) and `/signup` (create company → shows the generated company code with a copy button + "save this" messaging → then signs in).
 - Verified in the browser (dev + prod build): `/login` and `/signup` render correctly, no console errors; hitting `/` or `/dashboard` while logged out correctly 307-redirects to `/login?callbackUrl=...`; `POST /api/assistant` unauthenticated returns 401. **Not yet tested:** the actual DB-backed login/signup round trip (blocked on `DATABASE_URL`).
 
-**Old plan context below (Phases 3–4 still not started) — the complete approved plan — with exact schema, file lists, code-level design (including a verified-against-the-real-source merge algorithm), env vars, and verification steps for all 4 phases — is saved at:
+**All 4 phases of the original plan are now built** (Phase 1 pending its production push, see above; Phases 2–4 live). Old plan context below — the complete approved plan — with exact schema, file lists, code-level design (including a verified-against-the-real-source merge algorithm), env vars, and verification steps for all 4 phases — is saved at:
 
 **`/Users/mayankdev/.claude/plans/linked-rolling-hamming.md`**
 

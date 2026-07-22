@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, HelpCircle, LifeBuoy, Mail, MessageSquare } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ChevronDown, HelpCircle, LifeBuoy, Mail, MessageSquare, PlayCircle } from "lucide-react";
 
 const SUPPORT = [
   { icon: <MessageSquare size={18} />, title: "In-app chat", detail: "Chat with support from inside SmartOps, 9am–6pm on business days." },
@@ -58,11 +59,20 @@ function FaqRow({ q, a }: { q: string; a: string }) {
 }
 
 export default function HelpPage() {
+  const router = useRouter();
   return (
     <div className="h-full overflow-y-auto bg-slate-50">
-      <header className="border-b border-slate-200 bg-white px-6 py-3.5">
-        <h2 className="text-[15px] font-bold leading-tight text-slate-900">Help &amp; FAQ</h2>
-        <p className="text-xs leading-tight text-slate-500">Answers, guides, and how to reach us</p>
+      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3.5">
+        <div>
+          <h2 className="text-[15px] font-bold leading-tight text-slate-900">Help &amp; FAQ</h2>
+          <p className="text-xs leading-tight text-slate-500">Answers, guides, and how to reach us</p>
+        </div>
+        <button
+          onClick={() => router.push("/dashboard?tour=1")}
+          className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+        >
+          <PlayCircle size={14} /> Start tutorial
+        </button>
       </header>
 
       <div className="mx-auto max-w-3xl space-y-6 p-6">

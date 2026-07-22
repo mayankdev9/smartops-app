@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
+import type { Step } from "react-joyride";
 import {
   Area,
   AreaChart,
@@ -22,6 +24,8 @@ import { useSession } from "next-auth/react";
 import { useDashboardData, useDataStore } from "@/lib/store";
 import { exportExcel, exportPdf } from "@/lib/export";
 import SkuDrawer, { type SkuDetail } from "@/components/SkuDrawer";
+import ProductTour from "@/components/ProductTour";
+import { useTourStore } from "@/lib/tourStore";
 
 const HEALTH_STYLES: Record<"good" | "warn" | "urgent", { bg: string; ring: string; text: string; dot: string }> = {
   good: { bg: "bg-emerald-50", ring: "ring-emerald-200", text: "text-emerald-700", dot: "bg-emerald-500" },
@@ -127,8 +131,41 @@ export default function DashboardPage() {
   const hs = HEALTH_STYLES[health.tone];
   const topAction = d.insights.find((i) => i.tone === "urgent") ?? d.insights[0];
 
+  // Interactive product tour: auto-runs once for a first-time user, or on
+  // demand via the "Start tutorial" links (Sidebar footer, Help page), which
+  // navigate here with ?tour=1. Read via window.location (not useSearchParams)
+  // to avoid a Suspense-boundary requirement for a plain client page.
+  const router = useRouter();
+  const [forceTour, setForceTour] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    setIsDesktop(window.innerWidth >= 768);
+    if (new URLSearchParams(window.location.search).get("tour") === "1") setForceTour(true);
+  }, []);
+  const hasSeenNavTour = useTourStore((s) => s.hasSeenNavTour);
+  const markNavTourSeen = useTourStore((s) => s.markNavTourSeen);
+  const runTour = isDesktop && (forceTour || !hasSeenNavTour);
+  const navTourSteps: Step[] = [
+    { target: '[data-tour="nav-dashboard"]', content: "Your Dashboard — a quick read on overall business health, revenue, and what needs attention." },
+    { target: '[data-tour="nav-alerts"]', content: "Alerts groups everything that needs action — stockouts, slow-movers, and more — into one place." },
+    { target: '[data-tour="nav-upload"]', content: "Setup & Data is where you connect your business files (Excel or CSV, one or several)." },
+    { target: '[data-tour="nav-assistant"]', content: "The Assistant answers questions about your business in plain English — every answer Critic-validated." },
+    { target: '[data-tour="dashboard-health"]', content: "This card sums up your business health at a glance, plus your single top priority." },
+    d.isSample
+      ? { target: '[data-tour="dashboard-upload-cta"]', content: "Ready to see your own numbers? Upload your file here." }
+      : { target: '[data-tour="dashboard-data-banner"]', content: "This shows whose data is currently loaded — reset to the sample data any time." },
+  ];
+  function finishTour() {
+    markNavTourSeen();
+    if (forceTour) {
+      setForceTour(false);
+      router.replace("/dashboard");
+    }
+  }
+
   return (
     <div className="h-full overflow-y-auto bg-slate-50">
+      <ProductTour steps={navTourSteps} run={runTour} onFinish={finishTour} />
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3.5">
         <div>
           <h2 className="text-[15px] font-bold leading-tight text-slate-900">Dashboard</h2>
@@ -155,7 +192,7 @@ export default function DashboardPage() {
 
       <div className="mx-auto max-w-5xl space-y-5 p-6">
         {/* Business health — big picture first */}
-        <div className={`rounded-2xl ${hs.bg} p-5 ring-1 ${hs.ring}`}>
+        <div data-tour="dashboard-health" className={`rounded-2xl ${hs.bg} p-5 ring-1 ${hs.ring}`}>
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className={`flex h-11 w-11 items-center justify-center rounded-xl bg-white ${hs.text}`}>
@@ -189,12 +226,12 @@ export default function DashboardPage() {
               <Database size={15} className="text-brand" />
               Showing <strong className="font-semibold text-slate-800">sample data</strong> — upload your file to see your own numbers.
             </span>
-            <Link href="/onboarding" className="flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-dark">
+            <Link href="/onboarding" data-tour="dashboard-upload-cta" className="flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-dark">
               <Upload size={13} /> Upload data
             </Link>
           </div>
         ) : (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 px-4 py-2.5 text-sm">
+          <div data-tour="dashboard-data-banner" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 px-4 py-2.5 text-sm">
             <span className="flex items-center gap-2 text-slate-600">
               <Database size={15} className="text-emerald-600" />
               Showing your data: <strong className="font-semibold text-slate-800">{d.source}</strong>

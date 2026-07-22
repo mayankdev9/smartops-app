@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import type { Step } from "react-joyride";
 import {
   Activity,
   AlertCircle,
@@ -22,6 +23,8 @@ import { buildUnionMapping, classifyFile, describeSource, type FileKind } from "
 import { UploadSession, type ParsedMeta } from "@/lib/uploadSession";
 import { useSession } from "next-auth/react";
 import { useDashboardData, useDataStore } from "@/lib/store";
+import ProductTour from "@/components/ProductTour";
+import { useTourStore } from "@/lib/tourStore";
 
 const STEPS = ["Business", "Connect data", "Diagnosis"];
 const CURRENCIES = ["₹", "$", "€", "£"];
@@ -82,6 +85,19 @@ export default function OnboardingPage() {
     },
     [],
   );
+
+  // Interactive upload tour: auto-runs once, the first time a user reaches
+  // this step (desktop only — the mapping UI is dense and the mobile sidebar
+  // drawer/nav-tour steps are out of scope for v1).
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => setIsDesktop(window.innerWidth >= 768), []);
+  const hasSeenUploadTour = useTourStore((s) => s.hasSeenUploadTour);
+  const markUploadTourSeen = useTourStore((s) => s.markUploadTourSeen);
+  const runUploadTour = isDesktop && step === 1 && !hasSeenUploadTour;
+  const uploadTourSteps: Step[] = [
+    { target: '[data-tour="upload-select"]', content: "Select one or more sales/inventory files — .xlsx or .csv." },
+    { target: '[data-tour="upload-folder"]', content: "Or select a whole folder — we'll pick out the spreadsheets and combine them into one dashboard." },
+  ];
 
   async function handleFilesSelected(fileList: FileList | null) {
     if (!fileList) return;
@@ -274,6 +290,7 @@ export default function OnboardingPage() {
 
           {step === 1 && (
             <div className="space-y-4">
+              <ProductTour steps={uploadTourSteps} run={runUploadTour} onFinish={markUploadTourSeen} />
               <h3 className="text-lg font-bold text-slate-900">Connect your data</h3>
               <p className="text-sm text-slate-500">
                 SmartOps works with what you already have. Add a sales file, an inventory file, or both — we&apos;ll
@@ -282,7 +299,7 @@ export default function OnboardingPage() {
 
               {/* Two entry points: pick files, or a whole folder */}
               <div className="grid grid-cols-2 gap-3">
-                <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 py-6 text-center transition hover:border-brand hover:bg-blue-50/40">
+                <label data-tour="upload-select" className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 py-6 text-center transition hover:border-brand hover:bg-blue-50/40">
                   <Upload size={24} className="mb-1.5 text-slate-400" />
                   <span className="text-sm font-medium text-slate-700">Select files</span>
                   <span className="mt-0.5 text-xs text-slate-400">.xlsx or .csv, one or more</span>
@@ -297,7 +314,7 @@ export default function OnboardingPage() {
                     }}
                   />
                 </label>
-                <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 py-6 text-center transition hover:border-brand hover:bg-blue-50/40">
+                <label data-tour="upload-folder" className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 py-6 text-center transition hover:border-brand hover:bg-blue-50/40">
                   <FolderOpen size={24} className="mb-1.5 text-slate-400" />
                   <span className="text-sm font-medium text-slate-700">Select a folder</span>
                   <span className="mt-0.5 text-xs text-slate-400">We&apos;ll pick out the spreadsheets</span>
