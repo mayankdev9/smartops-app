@@ -6,7 +6,7 @@
 **Location:** `~/Documents/Claude/Applied Product Management/smartops-app/`
 **Repo:** https://github.com/mayankdev9/smartops-app (public, `main` branch)
 **Live:** https://smartops-agent.vercel.app (Vercel; auto-deploys on push to `main`; legacy alias `smartops-app-six.vercel.app` also resolves)
-**Status:** ✅ MVP complete & DEPLOYED (Jul 11, 2026) — all 5 screens + live API verified in production. ✅ **Real backend auth (Phase 2) LIVE (Jul 21, 2026).** ✅ **Server-side shared data warehouse (Phase 3) built + locally verified (Jul 21, 2026), pushing to production next.**
+**Status:** ✅ MVP complete & DEPLOYED (Jul 11, 2026) — all 5 screens + live API verified in production. ✅ **Real backend auth (Phase 2) LIVE.** ✅ **Server-side shared data warehouse (Phase 3) LIVE.** ✅ **Multi-file/folder upload + merge (Phase 4) built + verified (Jul 21, 2026), pushing to production next.**
 
 > This file is the source-of-truth for the SmartOps front-end. The course-level
 > status pointer lives in `../CLAUDE.md` (SmartOps section). Product/positioning
@@ -51,7 +51,19 @@ Walked Mayank through the Vercel/Neon dashboard step by step (screenshots each s
 
 **Both Phase 2 and Phase 3 are now live.** The app is no longer a prototype for auth or for shared data — a company's data genuinely follows the company code across any device/browser now, matching what Mayank asked for.
 
-**Still explicitly not done, not currently blocking:** Phase 1 (interactive tour), Phase 4 (folder upload/merge of different-shaped files). Full original plan at `~/.claude/plans/linked-rolling-hamming.md`.
+### ✅ Phase 4 — multi-file/folder upload with merge — built and verified (Jul 21, 2026), not yet pushed
+
+**What changed:** Onboarding's "Connect data" step now accepts multiple files at once (`<input multiple>`) or a whole folder (`webkitdirectory`, filtered client-side to `.csv`/`.xlsx`/`.xls`), each becoming its own card with an auto-detected type badge (Sales/Inventory — cosmetic only, `lib/mergeUpload.ts`'s `classifyFile()`), row count, and an editable column-mapping table (same `FIELDS`/`autoDetectMapping` UI as before, just repeated per file, default-collapsed once valid). "Combine & use my data" merges every file into **one** dashboard.
+
+**Merge design (per the original plan, verified against the real code before building):** rather than teaching `computeDashboard` about multiple files, each file's mapped columns are renamed to canonical `FieldKey` names (new `{type:"normalize"}` worker message, `lib/mergeUpload.ts`'s `renameToCanonical()`), every file's rows are concatenated, and `computeDashboard` runs **once** with a union mapping (`buildUnionMapping()` — identity mapping for whichever fields were mapped in *at least one* file). `toItems`/`computeDashboard` already handled sales-shaped + inventory-shaped rows for the same product correctly (`Math.max` for stock/price/cost, `+=` for units/revenue) — confirmed by reading the real code, not assumed. One real fix was needed and applied: `toItems`'s product-name join key was case-sensitive (`.trim()` only) — two files spelling the same SKU differently would've silently become two items. Fixed to merge case-insensitively (`.trim().toUpperCase()` as the map key) while keeping the first-seen casing for display.
+
+**Deliberate scope cut vs. the original plan:** skipped the `uploaded_files` bookkeeping table (metadata-only, wouldn't actually support true "remove one file and recompute" without storing raw rows, which conflicts with Phase 3's "aggregates only, never raw rows" design). Instead, `describeSource()` just lists the combined filenames in the dashboard's existing `source` string (e.g. "Combined (2 files): sales.csv, inventory.csv") — same transparency, zero new schema. Selective removal-and-recompute isn't supported; removing a file from the combine screen before clicking "Combine" works, but once saved, changing the mix means re-uploading everything together again.
+
+**Verified two ways:**
+1. **Standalone Node script** (esbuild-bundled, run directly against the real `lib/analytics.ts`/`lib/mergeUpload.ts`): a synthetic sales file + inventory file sharing products with mismatched SKU casing (`sku001` vs `SKU001`) merged into one item correctly (53 combined units, exactly 3 distinct SKUs not 4); a same-shaped two-sales-files case (different months) concatenated correctly (30 total units, 2-month trend).
+2. **Real browser E2E** — since this browser automation tool can't drive a native file picker, injected real `File` objects into the actual `<input>` via `DataTransfer` + a dispatched `change` event (a legitimate way to exercise the real code path, not a shortcut around it). Uploaded a sales CSV (`widget-a`/`widget-b`, lowercase) + an inventory CSV (`WIDGET-A`/`WIDGET-B`/`WIDGET-C`, uppercase) through the **real Web Worker pipeline** (parse → normalize → combine), confirmed the Diagnosis screen showed `widget-a is your top seller — 53 units` (13 from sales + 40 from inventory, proving the case-fix works through the real UI, not just the isolated script) and `WIDGET-C is your slowest mover` (inventory-only SKU correctly included). Reloaded the page fresh afterward — combined data persisted (confirms it saved to Postgres via Phase 3's pipeline, not just client state). Test company deleted afterward.
+
+**Not yet done:** push to `main` (Vercel auto-deploys — same pattern as Phases 2 and 3, will confirm live in production the same way before calling it done). `npm run build` already green locally.
 
 **What actually got built (Jul 21):**
 - **Stack exactly per the plan:** Auth.js v5 (NextAuth, Credentials provider) + Neon Postgres + Drizzle ORM + `bcryptjs`, JWT sessions.

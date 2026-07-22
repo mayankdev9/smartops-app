@@ -2,9 +2,23 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Activity, AlertCircle, ArrowRight, Check, FileSpreadsheet, Loader2, MessageCircle, Sparkles, Upload } from "lucide-react";
-import { autoDetectMapping, FIELDS, isMappingValid, type Mapping } from "@/lib/mapping";
-import { businessHealth } from "@/lib/analytics";
+import {
+  Activity,
+  AlertCircle,
+  ArrowRight,
+  Check,
+  ChevronDown,
+  FileSpreadsheet,
+  FolderOpen,
+  Loader2,
+  MessageCircle,
+  Sparkles,
+  Upload,
+  X,
+} from "lucide-react";
+import { autoDetectMapping, FIELDS, isMappingValid, type FieldKey, type Mapping } from "@/lib/mapping";
+import { businessHealth, computeDashboard } from "@/lib/analytics";
+import { buildUnionMapping, classifyFile, describeSource, type FileKind } from "@/lib/mergeUpload";
 import { UploadSession, type ParsedMeta } from "@/lib/uploadSession";
 import { useSession } from "next-auth/react";
 import { useDashboardData, useDataStore } from "@/lib/store";
@@ -24,6 +38,25 @@ const HEALTH_STYLES = {
   warn: { bg: "bg-amber-50", ring: "ring-amber-200", text: "text-amber-700", dot: "bg-amber-500" },
   urgent: { bg: "bg-red-50", ring: "ring-red-200", text: "text-red-700", dot: "bg-red-500" },
 } as const;
+const KIND_STYLES: Record<FileKind, { label: string; className: string }> = {
+  sales: { label: "Sales data", className: "bg-blue-50 text-brand" },
+  inventory: { label: "Inventory data", className: "bg-purple-50 text-purple-700" },
+  unknown: { label: "Type unclear", className: "bg-slate-100 text-slate-500" },
+};
+
+function isSpreadsheet(name: string): boolean {
+  return /\.(xlsx|xls|csv)$/i.test(name);
+}
+
+interface FileEntry {
+  id: string;
+  fileName: string;
+  parsed: ParsedMeta | null;
+  mapping: Mapping;
+  parsing: boolean;
+  error: string | null;
+  expanded: boolean;
+}
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -31,66 +64,128 @@ export default function OnboardingPage() {
   const { data: session } = useSession();
   const me = session?.user;
   const [step, setStep] = useState(0);
-  const [connected, setConnected] = useState(false);
-  const [parsed, setParsed] = useState<ParsedMeta | null>(null);
-  const [fileName, setFileName] = useState("");
-  const [parseError, setParseError] = useState<string | null>(null);
-  const [parsing, setParsing] = useState(false);
-  const [computing, setComputing] = useState(false);
-  const [mapping, setMapping] = useState<Mapping>({});
+  const [files, setFiles] = useState<FileEntry[]>([]);
+  const [combining, setCombining] = useState(false);
+  const [globalError, setGlobalError] = useState<string | null>(null);
   const [currency, setCurrency] = useState("₹");
   const [concern, setConcern] = useState("");
-  const sessionRef = useRef<UploadSession | null>(null);
+  const sessionsRef = useRef<Map<string, UploadSession>>(new Map());
   const d = useDashboardData();
   const health = businessHealth(d);
   const healthStyle = HEALTH_STYLES[health.tone];
 
-  // Tear down any worker when leaving the page.
-  useEffect(() => () => sessionRef.current?.dispose(), []);
+  // Tear down every file's worker when leaving the page.
+  useEffect(
+    () => () => {
+      sessionsRef.current.forEach((s) => s.dispose());
+      sessionsRef.current.clear();
+    },
+    [],
+  );
 
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setParsing(true);
-    setParseError(null);
-    setParsed(null);
-    setMapping({});
-    try {
-      sessionRef.current?.dispose();
-      const session = new UploadSession();
-      sessionRef.current = session;
-      const meta = await session.parse(file); // parses in a Web Worker (UI stays responsive)
-      setParsed(meta);
-      setFileName(file.name);
-      setMapping(autoDetectMapping(meta.columns));
-      setConnected(true);
-    } catch (err) {
-      setParseError(err instanceof Error ? err.message : "Could not read that file.");
-      setConnected(false);
-    } finally {
-      setParsing(false);
-      e.target.value = ""; // allow re-selecting the same file
-    }
+  async function handleFilesSelected(fileList: FileList | null) {
+    if (!fileList) return;
+    const picked = Array.from(fileList).filter((f) => isSpreadsheet(f.name));
+    if (picked.length === 0) return;
+    setGlobalError(null);
+
+    const entries: FileEntry[] = picked.map((file) => ({
+      id: `${file.name}-${file.size}-${Math.random().toString(36).slice(2, 8)}`,
+      fileName: file.name,
+      parsed: null,
+      mapping: {},
+      parsing: true,
+      error: null,
+      expanded: false,
+    }));
+    setFiles((prev) => [...prev, ...entries]);
+
+    await Promise.all(
+      picked.map(async (file, i) => {
+        const id = entries[i].id;
+        const uploadSession = new UploadSession();
+        sessionsRef.current.set(id, uploadSession);
+        try {
+          const meta = await uploadSession.parse(file);
+          const mapping = autoDetectMapping(meta.columns);
+          setFiles((prev) =>
+            prev.map((f) =>
+              f.id === id ? { ...f, parsed: meta, mapping, parsing: false, expanded: !isMappingValid(mapping) } : f,
+            ),
+          );
+        } catch (err) {
+          setFiles((prev) =>
+            prev.map((f) =>
+              f.id === id
+                ? { ...f, parsing: false, expanded: true, error: err instanceof Error ? err.message : "Could not read that file." }
+                : f,
+            ),
+          );
+        }
+      }),
+    );
   }
 
-  // Compute the dashboard (in the worker) from the parsed rows + mapping and store it.
-  async function finish() {
-    if (parsed && isMappingValid(mapping) && sessionRef.current) {
-      setComputing(true);
+  function removeFile(id: string) {
+    sessionsRef.current.get(id)?.dispose();
+    sessionsRef.current.delete(id);
+    setFiles((prev) => prev.filter((f) => f.id !== id));
+  }
+
+  function updateMapping(id: string, key: FieldKey, value: string) {
+    setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, mapping: { ...f.mapping, [key]: value || undefined } } : f)));
+  }
+
+  function toggleExpanded(id: string) {
+    setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, expanded: !f.expanded } : f)));
+  }
+
+  const validFiles = files.filter((f) => f.parsed && isMappingValid(f.mapping));
+  const anyParsing = files.some((f) => f.parsing);
+  const allValid = files.length > 0 && validFiles.length === files.length;
+
+  // Normalize every file's rows to canonical field keys, concatenate, and run
+  // computeDashboard ONCE over the combined set with a union mapping — the
+  // existing analytics engine already handles sales-shaped + inventory-shaped
+  // rows for the same product correctly, so no changes needed there.
+  async function combine() {
+    if (files.length > 0 && allValid) {
+      setCombining(true);
       try {
-        const data = await sessionRef.current.compute(mapping, currency, fileName);
+        const perFile = await Promise.all(
+          files.map(async (f) => {
+            const uploadSession = sessionsRef.current.get(f.id);
+            const rows = uploadSession ? await uploadSession.normalize(f.mapping) : [];
+            return { rows, mapping: f.mapping };
+          }),
+        );
+        const combinedRows = perFile.flatMap((f) => f.rows);
+        const unionMapping = buildUnionMapping(perFile.map((f) => f.mapping));
+        const source = describeSource(files.map((f) => f.fileName));
+        const data = computeDashboard(combinedRows, unionMapping, currency, source);
         if (me) await setData(me.companyId, data, me.name ?? "a teammate");
       } catch (err) {
-        setParseError(err instanceof Error ? err.message : "Could not process your data.");
-        setComputing(false);
+        setGlobalError(err instanceof Error ? err.message : "Could not process your data.");
+        setCombining(false);
         return;
       }
-      setComputing(false);
+      setCombining(false);
     }
     setStep(2);
   }
 
-  const canUseData = !!parsed && isMappingValid(mapping);
+  const totalRows = files.reduce((s, f) => s + (f.parsed?.rowCount ?? 0), 0);
+  const combineLabel = combining
+    ? "Combining your data…"
+    : files.length === 0
+      ? "Skip — use sample data"
+      : allValid
+        ? files.length > 1
+          ? "Combine & use my data →"
+          : "Use my data →"
+        : anyParsing
+          ? "Reading your files…"
+          : "Map required fields to continue";
 
   return (
     <div className="h-full overflow-y-auto bg-slate-50">
@@ -181,42 +276,53 @@ export default function OnboardingPage() {
             <div className="space-y-4">
               <h3 className="text-lg font-bold text-slate-900">Connect your data</h3>
               <p className="text-sm text-slate-500">
-                SmartOps works with what you already have. No new system to learn.
+                SmartOps works with what you already have. Add a sales file, an inventory file, or both — we&apos;ll
+                combine them into one dashboard.
               </p>
 
-              {/* Excel / CSV upload — real client-side parse */}
-              <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 py-8 text-center transition hover:border-brand hover:bg-blue-50/40">
-                {parsing ? (
-                  <Loader2 size={28} className="mb-2 animate-spin text-brand" />
-                ) : (
-                  <Upload size={28} className="mb-2 text-slate-400" />
-                )}
-                <span className="text-sm font-medium text-slate-700">
-                  {parsing ? "Reading your file…" : "Drop your sales & inventory file here"}
-                </span>
-                <span className="mt-0.5 text-xs text-slate-400">.xlsx or .csv — we detect the columns for you</span>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  className="hidden"
-                  onChange={handleFile}
-                  disabled={parsing}
-                />
-              </label>
-
-              {parseError && (
-                <div className="flex items-start gap-2 rounded-lg border border-red-100 bg-red-50 p-3 text-sm text-red-700">
-                  <AlertCircle size={16} className="mt-0.5 shrink-0" />
-                  <span>{parseError}</span>
-                </div>
-              )}
+              {/* Two entry points: pick files, or a whole folder */}
+              <div className="grid grid-cols-2 gap-3">
+                <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 py-6 text-center transition hover:border-brand hover:bg-blue-50/40">
+                  <Upload size={24} className="mb-1.5 text-slate-400" />
+                  <span className="text-sm font-medium text-slate-700">Select files</span>
+                  <span className="mt-0.5 text-xs text-slate-400">.xlsx or .csv, one or more</span>
+                  <input
+                    type="file"
+                    multiple
+                    accept=".xlsx,.xls,.csv"
+                    className="hidden"
+                    onChange={(e) => {
+                      handleFilesSelected(e.target.files);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 py-6 text-center transition hover:border-brand hover:bg-blue-50/40">
+                  <FolderOpen size={24} className="mb-1.5 text-slate-400" />
+                  <span className="text-sm font-medium text-slate-700">Select a folder</span>
+                  <span className="mt-0.5 text-xs text-slate-400">We&apos;ll pick out the spreadsheets</span>
+                  <input
+                    type="file"
+                    multiple
+                    // Non-standard attributes, supported by Chromium/WebKit browsers, for folder selection.
+                    // @ts-expect-error -- webkitdirectory/directory aren't in React's input attribute types
+                    webkitdirectory=""
+                    directory=""
+                    className="hidden"
+                    onChange={(e) => {
+                      handleFilesSelected(e.target.files);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <SourceCard
                   icon={<FileSpreadsheet size={18} className="text-emerald-600" />}
                   title="Excel / CSV"
-                  sub={parsed ? `${fileName} ✓` : "Upload above"}
-                  active={!!parsed}
+                  sub={files.length ? `${files.length} file${files.length > 1 ? "s" : ""} · ${totalRows.toLocaleString()} rows` : "Upload above"}
+                  active={files.length > 0}
                 />
                 <SourceCard
                   icon={<MessageCircle size={18} className="text-emerald-600" />}
@@ -225,106 +331,41 @@ export default function OnboardingPage() {
                 />
               </div>
 
-              {/* Parsed preview */}
-              {parsed && (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
-                  <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
-                    <Check size={16} className="text-emerald-600" />
-                    <span className="font-semibold text-slate-800">
-                      {parsed.rowCount.toLocaleString()} rows · {parsed.columns.length} columns detected
-                    </span>
-                  </div>
-                  <div className="mb-3 flex flex-wrap gap-1.5">
-                    {parsed.columns.slice(0, 8).map((c) => (
-                      <span key={c} className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
-                        {c}
-                      </span>
-                    ))}
-                    {parsed.columns.length > 8 && (
-                      <span className="px-1 text-xs text-slate-400">+{parsed.columns.length - 8} more</span>
-                    )}
-                  </div>
-                  <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr>
-                          {parsed.columns.slice(0, 6).map((c) => (
-                            <th key={c} className="whitespace-nowrap border-b border-slate-100 bg-slate-50 px-2.5 py-1.5 text-left font-semibold text-slate-600">
-                              {c}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {parsed.preview.map((row, ri) => (
-                          <tr key={ri}>
-                            {parsed.columns.slice(0, 6).map((c) => (
-                              <td key={c} className="whitespace-nowrap border-b border-slate-50 px-2.5 py-1.5 text-slate-600">
-                                {String(row[c])}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <p className="mt-2 text-xs text-slate-400">Showing first {parsed.preview.length} rows.</p>
+              {globalError && (
+                <div className="flex items-start gap-2 rounded-lg border border-red-100 bg-red-50 p-3 text-sm text-red-700">
+                  <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                  <span>{globalError}</span>
                 </div>
               )}
 
-              {/* Column mapping — auto-guessed, user can correct */}
-              {parsed && (
-                <div className="rounded-xl border border-slate-200 p-4">
-                  <div className="mb-3 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-800">Map your columns</p>
-                      <p className="text-xs text-slate-500">We auto-detected these — adjust if needed.</p>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs text-slate-500">Currency</span>
-                      <select
-                        value={currency}
-                        onChange={(e) => setCurrency(e.target.value)}
-                        className="rounded-lg border border-slate-300 px-2 py-1 text-sm outline-none focus:border-brand"
-                      >
-                        {CURRENCIES.map((c) => (
-                          <option key={c}>{c}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="space-y-2.5">
-                    {FIELDS.map((f) => (
-                      <div key={f.key} className="flex items-center gap-3">
-                        <div className="w-40 shrink-0">
-                          <span className="text-sm font-medium text-slate-700">{f.label}</span>
-                          {f.required && <span className="ml-1 text-red-500">*</span>}
-                          <p className="text-[11px] leading-tight text-slate-400">{f.hint}</p>
-                        </div>
-                        <select
-                          value={mapping[f.key] ?? ""}
-                          onChange={(e) => setMapping((m) => ({ ...m, [f.key]: e.target.value || undefined }))}
-                          className={`flex-1 rounded-lg border px-3 py-2 text-sm outline-none focus:border-brand ${
-                            f.required && !mapping[f.key] ? "border-red-300 bg-red-50/40" : "border-slate-300"
-                          }`}
-                        >
-                          <option value="">— not in my file —</option>
-                          {parsed.columns.map((c) => (
-                            <option key={c} value={c}>
-                              {c}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+              {/* Currency — one shared setting across every file */}
+              {files.length > 0 && (
+                <div className="flex items-center justify-end gap-1.5">
+                  <span className="text-xs text-slate-500">Currency</span>
+                  <select
+                    value={currency}
+                    onChange={(e) => setCurrency(e.target.value)}
+                    className="rounded-lg border border-slate-300 px-2 py-1 text-sm outline-none focus:border-brand"
+                  >
+                    {CURRENCIES.map((c) => (
+                      <option key={c}>{c}</option>
                     ))}
-                  </div>
-                  {!isMappingValid(mapping) && (
-                    <p className="mt-3 text-xs text-red-600">
-                      Map the required fields (Product & Units sold) to use your data.
-                    </p>
-                  )}
+                  </select>
                 </div>
               )}
+
+              {/* One card per selected file */}
+              <div className="space-y-3">
+                {files.map((f) => (
+                  <FileCard
+                    key={f.id}
+                    entry={f}
+                    onToggle={() => toggleExpanded(f.id)}
+                    onRemove={() => removeFile(f.id)}
+                    onMappingChange={(key, value) => updateMapping(f.id, key, value)}
+                  />
+                ))}
+              </div>
 
               <div className="flex gap-2">
                 <button
@@ -334,18 +375,12 @@ export default function OnboardingPage() {
                   Back
                 </button>
                 <button
-                  onClick={finish}
-                  disabled={computing || (!!parsed && !canUseData)}
+                  onClick={combine}
+                  disabled={combining || anyParsing || (files.length > 0 && !allValid)}
                   className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-brand py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:opacity-40"
                 >
-                  {computing && <Loader2 size={15} className="animate-spin" />}
-                  {computing
-                    ? "Analyzing your data…"
-                    : canUseData
-                      ? "Use my data →"
-                      : parsed
-                        ? "Map required fields to continue"
-                        : "Skip — use sample data"}
+                  {(combining || anyParsing) && <Loader2 size={15} className="animate-spin" />}
+                  {combineLabel}
                 </button>
               </div>
             </div>
@@ -446,6 +481,119 @@ function SourceCard({
         <span className="text-sm font-medium text-slate-800">{title}</span>
       </div>
       <p className="text-xs text-slate-500">{sub}</p>
+    </div>
+  );
+}
+
+function FileCard({
+  entry,
+  onToggle,
+  onRemove,
+  onMappingChange,
+}: {
+  entry: FileEntry;
+  onToggle: () => void;
+  onRemove: () => void;
+  onMappingChange: (key: FieldKey, value: string) => void;
+}) {
+  const valid = entry.parsed ? isMappingValid(entry.mapping) : false;
+  const kind = entry.parsed ? classifyFile(entry.fileName, entry.mapping) : null;
+
+  return (
+    <div className={`rounded-xl border ${valid || entry.parsing ? "border-slate-200" : "border-red-200"} bg-white`}>
+      {/* A plain div (not a <button>) so the "remove" button below can be a real,
+          independently-clickable <button> — nesting interactive elements inside
+          a <button> is invalid HTML and behaves inconsistently across browsers. */}
+      <div
+        onClick={entry.parsing ? undefined : onToggle}
+        className={`flex w-full items-center gap-2.5 px-4 py-3 text-left ${entry.parsing ? "" : "cursor-pointer"}`}
+      >
+        {entry.parsing ? (
+          <Loader2 size={16} className="shrink-0 animate-spin text-brand" />
+        ) : entry.error ? (
+          <AlertCircle size={16} className="shrink-0 text-red-500" />
+        ) : (
+          <FileSpreadsheet size={16} className="shrink-0 text-emerald-600" />
+        )}
+        <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">{entry.fileName}</span>
+        {entry.parsed && (
+          <span className="shrink-0 text-xs text-slate-400">{entry.parsed.rowCount.toLocaleString()} rows</span>
+        )}
+        {kind && (
+          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${KIND_STYLES[kind].className}`}>
+            {KIND_STYLES[kind].label}
+          </span>
+        )}
+        {!valid && !entry.parsing && !entry.error && (
+          <span className="shrink-0 rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-600">
+            Needs mapping
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          aria-label={`Remove ${entry.fileName}`}
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+        >
+          <X size={14} />
+        </button>
+        {entry.parsed && (
+          <ChevronDown size={16} className={`shrink-0 text-slate-400 transition-transform ${entry.expanded ? "rotate-180" : ""}`} />
+        )}
+      </div>
+
+      {entry.error && (
+        <div className="mx-4 mb-3 flex items-start gap-2 rounded-lg border border-red-100 bg-red-50 p-2.5 text-xs text-red-700">
+          <AlertCircle size={14} className="mt-0.5 shrink-0" />
+          <span>{entry.error}</span>
+        </div>
+      )}
+
+      {entry.expanded && entry.parsed && (
+        <div className="space-y-3 border-t border-slate-100 px-4 py-3">
+          <div className="flex flex-wrap gap-1.5">
+            {entry.parsed.columns.slice(0, 8).map((c) => (
+              <span key={c} className="rounded-full bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
+                {c}
+              </span>
+            ))}
+            {entry.parsed.columns.length > 8 && (
+              <span className="px-1 text-xs text-slate-400">+{entry.parsed.columns.length - 8} more</span>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            {FIELDS.map((f) => (
+              <div key={f.key} className="flex items-center gap-3">
+                <div className="w-36 shrink-0">
+                  <span className="text-xs font-medium text-slate-700">{f.label}</span>
+                  {f.required && <span className="ml-1 text-red-500">*</span>}
+                </div>
+                <select
+                  value={entry.mapping[f.key] ?? ""}
+                  onChange={(e) => onMappingChange(f.key, e.target.value)}
+                  className={`flex-1 rounded-lg border px-2.5 py-1.5 text-xs outline-none focus:border-brand ${
+                    f.required && !entry.mapping[f.key] ? "border-red-300 bg-red-50/40" : "border-slate-300"
+                  }`}
+                >
+                  <option value="">— not in this file —</option>
+                  {entry.parsed!.columns.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
+          {!valid && (
+            <p className="text-xs text-red-600">Map the required fields (Product &amp; Units sold) to include this file.</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

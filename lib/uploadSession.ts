@@ -7,6 +7,7 @@
 
 import { parseArrayBuffer } from "./parseUpload";
 import { computeDashboard, type DashboardData } from "./analytics";
+import { renameToCanonical } from "./mergeUpload";
 import type { Mapping } from "./mapping";
 
 export interface ParsedMeta {
@@ -45,6 +46,19 @@ export class UploadSession {
       return this.roundtrip<DashboardData>(this.worker, { type: "compute", mapping, currency, fileName }, "computed");
     }
     return computeDashboard(this.fallbackRows ?? [], mapping, currency, fileName);
+  }
+
+  /**
+   * Rename this file's mapped columns to canonical field keys, returning the
+   * full row set (not just a preview) — used to combine multiple files into
+   * one dashboard (Phase 4). Caller concatenates rows from every file and
+   * calls computeDashboard once with a union mapping.
+   */
+  async normalize(mapping: Mapping): Promise<Record<string, unknown>[]> {
+    if (this.worker) {
+      return this.roundtrip<Record<string, unknown>[]>(this.worker, { type: "normalize", mapping }, "normalized");
+    }
+    return renameToCanonical(this.fallbackRows ?? [], mapping);
   }
 
   dispose() {

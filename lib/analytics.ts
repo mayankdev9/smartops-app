@@ -165,10 +165,15 @@ function fileHasReturns(rows: Record<string, unknown>[], m: Mapping): boolean {
 /** Aggregate rows by product (handles both transaction logs and inventory snapshots). */
 function toItems(rows: Record<string, unknown>[], m: Mapping): Item[] {
   const rowRevenue = makeRowRevenue(m);
+  // Keyed by a normalized (trimmed + uppercased) name so two files spelling the
+  // same SKU with different casing (e.g. "SKU001" vs "sku001") still merge into
+  // one item — matters once Phase 4 combines multiple files. The first-seen
+  // original casing is kept for display.
   const byName = new Map<string, Item>();
   for (const row of rows) {
-    const name = String(row[m.product as string] ?? "").trim();
-    if (!name) continue;
+    const rawName = String(row[m.product as string] ?? "").trim();
+    if (!rawName) continue;
+    const key = rawName.toUpperCase();
     // Net-aware: a return row subtracts its units and revenue from the SKU.
     const sign = isReturnRow(row, m) ? -1 : 1;
     const sold = (m.unitsSold ? Math.abs(toNum(row[m.unitsSold])) : 0) * sign;
@@ -177,7 +182,7 @@ function toItems(rows: Record<string, unknown>[], m: Mapping): Item[] {
     const cost = m.cost ? toNum(row[m.cost]) : 0;
     const revenue = Math.abs(rowRevenue(row)) * sign;
 
-    const existing = byName.get(name);
+    const existing = byName.get(key);
     if (existing) {
       existing.sold += sold;
       existing.revenue += revenue;
@@ -185,7 +190,7 @@ function toItems(rows: Record<string, unknown>[], m: Mapping): Item[] {
       existing.price = Math.max(existing.price, price);
       existing.cost = Math.max(existing.cost, cost);
     } else {
-      byName.set(name, { name, sold, onHand, price, cost, revenue });
+      byName.set(key, { name: rawName, sold, onHand, price, cost, revenue });
     }
   }
   return [...byName.values()];
