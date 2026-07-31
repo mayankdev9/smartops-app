@@ -361,6 +361,7 @@ export function computeDashboard(
   }));
 
   // Stockout risk: needs on-hand. Approx daily sales = sold / 30 days.
+  const unitValue = (i: Item) => (hasCost ? i.cost : i.price);
   const stockoutRisks: StockoutRisk[] = hasOnHand
     ? items
         .filter((i) => i.onHand > 0 && i.sold > 0)
@@ -372,6 +373,7 @@ export function computeDashboard(
             dailySales: Math.round(dailySales * 10) / 10,
             daysLeft: Math.round((i.onHand / dailySales) * 10) / 10,
             reorder: Math.ceil(dailySales * 14),
+            unitCost: hasPrice || hasCost ? Math.round(unitValue(i) * 100) / 100 : undefined,
           };
         })
         .filter((r) => r.daysLeft <= 10)
@@ -380,7 +382,6 @@ export function computeDashboard(
     : [];
 
   // Slow-movers: lowest sales with capital tied up in stock.
-  const unitValue = (i: Item) => (hasCost ? i.cost : i.price);
   const slowItems = hasOnHand
     ? [...items].filter((i) => i.onHand > 0).sort((a, b) => a.sold - b.sold).slice(0, 4)
     : [];

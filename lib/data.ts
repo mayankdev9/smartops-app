@@ -31,12 +31,13 @@ export interface StockoutRisk {
   dailySales: number;
   daysLeft: number;
   reorder: number;
+  unitCost?: number; // per-unit cost, when the source data carries a price/cost column
 }
 
 export const stockoutRisks: StockoutRisk[] = [
-  { sku: "Coca-Cola 500ml", onHand: 48, dailySales: 22, daysLeft: 2.2, reorder: 600 },
-  { sku: "Lay's Classic 45g", onHand: 90, dailySales: 31, daysLeft: 2.9, reorder: 900 },
-  { sku: "Dettol Soap 4-pack", onHand: 35, dailySales: 9, daysLeft: 3.9, reorder: 250 },
+  { sku: "Coca-Cola 500ml", onHand: 48, dailySales: 22, daysLeft: 2.2, reorder: 600, unitCost: 38 },
+  { sku: "Lay's Classic 45g", onHand: 90, dailySales: 31, daysLeft: 2.9, reorder: 900, unitCost: 20 },
+  { sku: "Dettol Soap 4-pack", onHand: 35, dailySales: 9, daysLeft: 3.9, reorder: 250, unitCost: 145 },
 ];
 
 export interface SlowMover {

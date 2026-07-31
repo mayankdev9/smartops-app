@@ -67,11 +67,16 @@ function Tile({ cat, onClick }: { cat: AlertCategory; onClick: () => void }) {
 }
 
 function CategoryDrawer({ cat, currency, onClose }: { cat: AlertCategory; currency: string; onClose: () => void }) {
-  void currency;
   const { data: session } = useSession();
-  const poOpts = { businessName: session?.user?.companyName ?? "Your business", generatedBy: session?.user?.name ?? undefined };
+  const poOpts = {
+    businessName: session?.user?.companyName ?? "Your business",
+    generatedBy: session?.user?.name ?? undefined,
+    currency,
+  };
   const alerts = sortByPriority(cat.alerts);
-  const poLines = cat.alerts.filter((a) => a.reorder !== undefined).map((a) => ({ sku: a.sku ?? "SKU", reorder: a.reorder! }));
+  const poLines = cat.alerts
+    .filter((a) => a.reorder !== undefined)
+    .map((a) => ({ sku: a.sku ?? "SKU", reorder: a.reorder!, price: a.unitCost }));
 
   return (
     <div className="fixed inset-0 z-50">
@@ -111,7 +116,7 @@ function CategoryDrawer({ cat, currency, onClose }: { cat: AlertCategory; curren
                 </span>
                 {a.reorder !== undefined && (
                   <button
-                    onClick={() => exportPO([{ sku: a.sku ?? "SKU", reorder: a.reorder! }], poOpts)}
+                    onClick={() => exportPO([{ sku: a.sku ?? "SKU", reorder: a.reorder!, price: a.unitCost }], poOpts)}
                     className="rounded-lg border border-brand px-2.5 py-1 text-xs font-semibold text-brand transition hover:bg-blue-50"
                   >
                     Generate PO

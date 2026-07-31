@@ -17,6 +17,7 @@ export interface Alert {
   priority: Priority;
   sku?: string;
   reorder?: number; // present on Generate PO alerts
+  unitCost?: number; // present on Generate PO alerts when the source data has a price/cost column
 }
 
 export type CategoryIcon =
@@ -62,6 +63,7 @@ export function buildAlertCategories(d: DashboardData): AlertCategory[] {
     priority: s.daysLeft < 2.5 ? "critical" : s.daysLeft < 5 ? "high" : "normal",
     sku: s.sku,
     reorder: s.reorder,
+    unitCost: s.unitCost,
   }));
 
   // --- Stock-outs (data-driven) ---
