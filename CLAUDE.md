@@ -6,7 +6,7 @@
 **Location:** `~/Documents/Claude/Applied Product Management/smartops-app/`
 **Repo:** https://github.com/mayankdev9/smartops-app (public, `main` branch)
 **Live:** https://smartops-agent.vercel.app (Vercel; auto-deploys on push to `main`; legacy alias `smartops-app-six.vercel.app` also resolves)
-**Status:** ✅ MVP complete & DEPLOYED (Jul 11, 2026) — all 5 screens + live API verified in production. ✅ **All 4 phases now LIVE:** real backend auth (Phase 2), server-side shared data warehouse (Phase 3), multi-file/folder upload + merge (Phase 4), interactive product tour (Phase 1) — Mayank confirmed the tour working live and has **shared the product with the team** (Jul 21, 2026). **⏸️ Session paused here** — see "▶▶▶ RESUME HERE" below.
+**Status:** ✅ MVP complete & DEPLOYED (Jul 11, 2026) — all 5 screens + live API verified in production. ✅ **All 4 phases live** (Phase 1–4, Jul 21, 2026). 🎤 **Demo day:** group demo Jul 30, professor demo Jul 31, 2026 — 3 real pilot companies onboarded with real testimonials for the deck. **Two bugs found + fixed while prepping the demo (Jul 30) — pending Mayank's manual verification at home** — see "▶▶▶ RESUME HERE" below.
 
 > This file is the source-of-truth for the SmartOps front-end. The course-level
 > status pointer lives in `../CLAUDE.md` (SmartOps section). Product/positioning
@@ -14,9 +14,17 @@
 
 ---
 
-## ▶▶▶ RESUME HERE (Jul 21 — all 4 phases live, product shared with the team, session paused)
+## ▶▶▶ RESUME HERE (Jul 30 — 3 real pilot companies onboarded, 2 bugs found + fixed during demo prep, pending Mayank's home verification)
 
-**Where things actually stand at the pause point:** all 4 phases (auth, shared data, multi-file upload, tour) are built, pushed, and confirmed live in production. Mayank personally verified the tour works on the live site (closing out a gap where Claude's browser tool hit an infra outage mid-verification and couldn't confirm it directly) and has **shared the live link with the team**. **Not yet done, and the natural next session's work:** Mayank creating the 3 real demo companies (clothing, salon, dessert manufacturer) with real uploaded data, adding real teammates as users per company, and collecting feedback on whether everyone can actually log in and see the right company's data — the exact problem Phase 2 was built to fix, now live for the team to test for real. Also still open, not blocking: Phase 4's `uploaded_files` bookkeeping table / selective-file-removal (deliberately cut, see Phase 4 section below), and mobile support for the tour (currently desktop-only).
+**Where things stand:** the "3 real demo companies" work from the Jul 21 pause is done — **CAVA Athleisure** (clothing, 5 users), **Sangeeta's Makeup House** (salon, 2 users), and **Sweet Craft** (dessert manufacturer, 1 user) are onboarded with real data, and Mayank collected real founder testimonials from all three (with their clearance) for the course presentation deck. The "Pilot Results & Key Learnings" slide in `Group Project/SmartOps ERP Final Presentation Overview.pdf` was rewritten to replace fabricated placeholder stats (invented "42 pilot users / 87% engagement / 4.4/5 satisfaction" and "35%/28%/6-hours" efficiency numbers that were never actually measured) with these 3 real companies + real testimonials. **Today (Jul 30) is the group demo; the professor demo is Jul 31.** Also prepped this session: a 3-minute live-demo script, a 20-second speaking script for the pilot-results slide, an architecture flowchart, and talking points for two expected tough questions ("why SmartOps vs. just uploading data to Claude" and "what's the moat" — Ahmer's question).
+
+**Two real product bugs found while Mayank used the live app to rehearse the demo, both fixed same-day — see "Bug fixes" section below for full technical detail. Not yet click-verified live** (this session's local dev-server/browser-preview tooling hit an environment issue unrelated to the code) — **Mayank is verifying both at home tonight before the demos.**
+1. "Start tutorial" (Sidebar footer / Help page) didn't start the tour until a manual page refresh.
+2. The Generate PO PDF always showed "Sharma Trading Co." as the buyer regardless of which company was logged in (found testing with SweetCraft's account) — PO layout also redesigned per Mayank's spec.
+
+**One naming decision, don't re-litigate:** the product/team name stays **"SmartOps ERP"** in branding/decks/slides — that's what the professor and class call it. This is separate from the in-app **"AI General Manager"** positioning pivot (locked Jul 15), which is about how the assistant is framed inside the product, not the product's actual name.
+
+**Not yet done, still open, not blocking today's demos:** Phase 4's `uploaded_files` bookkeeping table / selective-file-removal (deliberately cut, see Phase 4 section below), mobile support for the tour (currently desktop-only), and a slide-by-slide pass on leftover "ERP" *positioning copy* (not the name itself) in the Canva deck body text (see `Applied Product Management/CLAUDE.md`'s "Brand alignment" entry).
 
 #### Earlier context from this session — why Phases 2+3 got pulled forward
 
@@ -610,8 +618,25 @@ Still open:
 
 ---
 
+## 🐛 Bug fixes — tour trigger + PO buyer name (Jul 30, 2026) — pending Mayank's home verification
+
+Found while Mayank used the live product to rehearse for the Jul 30 group demo / Jul 31 professor demo. `npx tsc --noEmit` passes clean on both. **Not yet click-verified in a browser this session** — the local dev server (`next dev`) and the browser-preview tool both hit what looked like a genuine environment/sandbox issue (Node processes hanging without ever binding a port; an unrelated `EPERM: uv_cwd` error from the preview tool's own `npm` invocation), not something in the code. Mayank is verifying both live at home before the demos.
+
+**1. "Start tutorial" didn't start until a page refresh.** Root cause: both `components/Sidebar.tsx` (footer) and `app/(app)/help/page.tsx` triggered the tour via `router.push("/dashboard?tour=1")`, and `app/(app)/dashboard/page.tsx` read the `tour` query param in a **mount-only** `useEffect(() => {...}, [])`. That works when navigating *from* another page (fresh mount), but if the user is already on `/dashboard`, Next.js doesn't remount the page for a query-string-only navigation, so the effect never re-runs — only a hard refresh (forcing a fresh mount) ever picked up `?tour=1`.
+**Fix:** added a reactive `tourRequestNonce` counter + `requestTour()` action to `lib/tourStore.ts` (zustand; deliberately excluded from persistence via `partialize` — it's a one-shot signal, not durable state, so a reload doesn't force-replay the tour). Both "Start tutorial" buttons now call `useTourStore.getState().requestTour()` before navigating. The Dashboard page watches the nonce via its own `useEffect(() => {...}, [tourRequestNonce])`, so a click fires the tour immediately whether the user is already on the Dashboard or arriving from elsewhere — no remount dependency. The original URL-based mount effect was left in place too (harmless redundancy; still supports a direct/bookmarked `?tour=1` link).
+
+**2. The Generate PO PDF always showed "Sharma Trading Co." as the buyer**, regardless of which company was actually logged in — surfaced testing with SweetCraft's account. Root cause: `lib/export.ts`'s `exportPO(lines, businessName = "Sharma Trading Co.")` carried the old sample company as a silent default, and both call sites in `app/(app)/alerts/page.tsx` called `exportPO(lines)` without ever passing the real company.
+**Fix:** `businessName` is now a required field on a `POOptions` object passed as the second argument — no fallback, so a caller that forgets it is a TypeScript error, not a silent wrong answer. The Alerts page now reads `session.user.companyName` + `session.user.name` (via `useSession()`) and passes them through as `{ businessName, generatedBy }` to both PO buttons (the "all items" button and the per-alert button).
+
+**Also redesigned the PO layout** per Mayank's spec — company name top-left (letterhead) → "Purchase Order" title → PO#/date → line-item table → **"Generated by: [logged-in user's real name]"** — plus two cheap additions he invited: a **Total** row summing reorder quantities at the bottom of the table, and a small **DRAFT** status badge top-right (both common on real POs; neither needed a new dependency). Also made the PDF's page height scale to content (`Math.min(Math.max(114 + lines.length * 7, 130), 297)`, in mm, capped at standard A4 so large lists still paginate normally) instead of a fixed full A4 sheet, since a 1–2 line PO was leaving most of the page blank in the original.
+
+**Files touched:** `lib/tourStore.ts`, `components/Sidebar.tsx`, `app/(app)/help/page.tsx`, `app/(app)/dashboard/page.tsx`, `lib/export.ts`, `app/(app)/alerts/page.tsx`.
+
+---
+
 ## Session log
 
+| Jul 30, 2026 | **3 real pilot companies confirmed onboarded** (CAVA Athleisure, Sangeeta's Makeup House, Sweet Craft) with real founder testimonials collected for the course deck's "Pilot Results & Key Learnings" slide, replacing fabricated placeholder stats. **Two real bugs found rehearsing the demo, both fixed same-day** (see "Bug fixes" section above for full detail): (1) "Start tutorial" needed a refresh to actually start — fixed with a reactive `tourRequestNonce` in `lib/tourStore.ts` so the click works whether already on the Dashboard or not. (2) Generate PO always showed "Sharma Trading Co." regardless of the logged-in company — `exportPO` now requires the real `businessName`/`generatedBy` from the session, no more silent fallback; PO layout also redesigned (letterhead, PO#/date, line items, Generated-by, a Total row, a DRAFT badge, content-sized page height). `tsc --noEmit` clean; **not yet click-verified live** — this session's local dev server + browser preview hit an environment issue unrelated to the code — Mayank verifying both at home before today's group demo and tomorrow's professor demo. |
 | Jul 17, 2026 | **Team accounts created + product shared for first external UI/UX feedback round.** Mayank added Paola Whittier (`pwhittier`), Abdulrahman Almarwan (`aalmarwan`), and Ahmer Rizvi (`arizvi`) as CAVA members via **Team**, so they land on the already-uploaded real data without re-uploading; sent each their login + a how-to-explore message privately. Follows the confirmed upload fix below. |
 | Jul 17, 2026 | **Upload freeze FIXED, deployed, and CONFIRMED by Mayank** (commit `f55e8d4`, live). (1) The `62883e6` worker wasn't compiled by Turbopack's prod build (raw `.ts` in `static/media`) → sync fallback → freeze; fixed by pre-bundling the worker with **esbuild** → `public/upload-worker.js` (`scripts/build-worker.mjs`, `prebuild`/`predev`). (2) `XLSX.read` on the real file was ~75s; tuned read options (`dense:true` + skip formula/style/HTML/text) → ~26s, identical results (node-verified: ₹52.4Cr, 22.3% returns, trend/geo/channel intact). Verified worker serves + parses in a `next start` prod build and on live; Mayank then uploaded the real 30MB file on the live site and confirmed no "Page unresponsive." **Closed.** |
 | Jul 16, 2026 | **Crash fix — "This page couldn't load"** (commit `9d66743`, live): a file uploaded before the geoBreakdown/channel/payment/returns fields existed was persisted in localStorage without them; the new UI read `d.geoBreakdown.length` on that stale object and crashed the whole page. Added `normalizeDashboard()` (backfills any missing `DashboardData` fields) and run it from the data store's persist `merge`, so old saved records self-heal on load (no lost uploads, no per-render allocation); also made `buildBusinessContext` tolerant of missing arrays. Reproduced the crash with old-shape data on the live site, then confirmed the fix renders it. **Lesson: when adding non-optional `DashboardData` fields, they must be backfilled for persisted data.** |
@@ -655,4 +680,4 @@ Still open:
 
 ---
 
-*Last updated: 2026-07-21*
+*Last updated: 2026-07-30*
