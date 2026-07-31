@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { BadgeCheck, Bell, HelpCircle, LayoutDashboard, LogOut, Menu, MessageSquare, PlayCircle, Settings, Users, X, Zap, type LucideIcon } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
+import { useTourStore } from "@/lib/tourStore";
 
 interface NavItem {
   href: string;
@@ -83,7 +84,10 @@ function Footer() {
         </p>
       </div>
       <button
-        onClick={() => router.push("/dashboard?tour=1")}
+        onClick={() => {
+          useTourStore.getState().requestTour();
+          router.push("/dashboard?tour=1");
+        }}
         className="flex w-full items-center gap-2 rounded-lg px-1 py-1.5 text-xs font-medium text-slate-500 transition hover:text-slate-800"
       >
         <PlayCircle size={14} /> Start tutorial

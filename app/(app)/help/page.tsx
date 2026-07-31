@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, HelpCircle, LifeBuoy, Mail, MessageSquare, PlayCircle } from "lucide-react";
+import { useTourStore } from "@/lib/tourStore";
 
 const SUPPORT = [
   { icon: <MessageSquare size={18} />, title: "In-app chat", detail: "Chat with support from inside SmartOps, 9am–6pm on business days." },
@@ -68,7 +69,10 @@ export default function HelpPage() {
           <p className="text-xs leading-tight text-slate-500">Answers, guides, and how to reach us</p>
         </div>
         <button
-          onClick={() => router.push("/dashboard?tour=1")}
+          onClick={() => {
+            useTourStore.getState().requestTour();
+            router.push("/dashboard?tour=1");
+          }}
           className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
         >
           <PlayCircle size={14} /> Start tutorial

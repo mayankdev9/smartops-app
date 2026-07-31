@@ -144,6 +144,13 @@ export default function DashboardPage() {
   }, []);
   const hasSeenNavTour = useTourStore((s) => s.hasSeenNavTour);
   const markNavTourSeen = useTourStore((s) => s.markNavTourSeen);
+  const tourRequestNonce = useTourStore((s) => s.tourRequestNonce);
+  // Fires "Start tutorial" clicks made while already on this page — the
+  // effect above only catches a fresh navigation/reload, since a same-route
+  // query-string push doesn't remount the component and re-run it.
+  useEffect(() => {
+    if (tourRequestNonce > 0) setForceTour(true);
+  }, [tourRequestNonce]);
   const runTour = isDesktop && (forceTour || !hasSeenNavTour);
   const navTourSteps: Step[] = [
     { target: '[data-tour="nav-dashboard"]', content: "Your Dashboard — a quick read on overall business health, revenue, and what needs attention." },

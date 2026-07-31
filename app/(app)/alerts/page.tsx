@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 import {
   AlertTriangle, ChevronRight, ClipboardList, CreditCard, Percent, RotateCcw,
   Snowflake, TrendingUp, Truck, X,
@@ -67,6 +68,8 @@ function Tile({ cat, onClick }: { cat: AlertCategory; onClick: () => void }) {
 
 function CategoryDrawer({ cat, currency, onClose }: { cat: AlertCategory; currency: string; onClose: () => void }) {
   void currency;
+  const { data: session } = useSession();
+  const poOpts = { businessName: session?.user?.companyName ?? "Your business", generatedBy: session?.user?.name ?? undefined };
   const alerts = sortByPriority(cat.alerts);
   const poLines = cat.alerts.filter((a) => a.reorder !== undefined).map((a) => ({ sku: a.sku ?? "SKU", reorder: a.reorder! }));
 
@@ -90,7 +93,7 @@ function CategoryDrawer({ cat, currency, onClose }: { cat: AlertCategory; curren
         {cat.id === "po" && poLines.length > 0 && (
           <div className="border-b border-slate-100 px-5 py-3">
             <button
-              onClick={() => exportPO(poLines)}
+              onClick={() => exportPO(poLines, poOpts)}
               className="w-full rounded-lg bg-brand py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark"
             >
               Generate PO for all {poLines.length} items
@@ -108,7 +111,7 @@ function CategoryDrawer({ cat, currency, onClose }: { cat: AlertCategory; curren
                 </span>
                 {a.reorder !== undefined && (
                   <button
-                    onClick={() => exportPO([{ sku: a.sku ?? "SKU", reorder: a.reorder! }])}
+                    onClick={() => exportPO([{ sku: a.sku ?? "SKU", reorder: a.reorder! }], poOpts)}
                     className="rounded-lg border border-brand px-2.5 py-1 text-xs font-semibold text-brand transition hover:bg-blue-50"
                   >
                     Generate PO
